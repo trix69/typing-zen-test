@@ -7,12 +7,15 @@
     warm: "⌨️ Warm-up", words: "🌼 Word Garden", spell: "🐝 Spelling Bee",
     sentences: "🌊 Sentence Stream", fixit: "🔧 Fix-It", tricky: "🎯 Tricky Words",
   };
+  // Timed games: Spelling Bee is a 20-minute session with as many words as Luke can manage.
+  // Words come in batches of ROUND.spell, and none repeats within a session.
+  const MINUTES = { spell: 20 };
   const PRAISE = ["Lovely!", "Brilliant!", "Smooth!", "Nice and calm.", "Great typing!", "Spot on!"];
 
   // ---------- Saved progress (per browser) ----------
   const KEY = "typingZen.v1-test";
   const profile = Object.assign(
-    { name: "Luke", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, mute: false },
+    { name: "Luke", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false },
     (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })()
   );
   // Names start with a capital, and a blank name falls back to Luke.
@@ -217,9 +220,12 @@
       case "words":
         return freshPick(pool, n, byWord).map((w) => ({ ...w, target: w.word }));
       case "spell": {
-        // Up to 3 tricky words from this level come back for another go; the rest are fresh words.
-        const tricky = pickN(pool.filter((w) => profile.tricky[w.word]), 3);
-        const fresh = freshPick(pool.filter((w) => !tricky.includes(w)), n - tricky.length, byWord);
+        // Each batch: up to 3 tricky words from this level come back for another go; the rest are fresh
+        // words. Words already in this session are left out, so nothing repeats in 20 minutes.
+        const used = new Set(game && game.mode === "spell" ? game.items.map((it) => it.word) : []);
+        const left = pool.filter((w) => !used.has(w.word));
+        const tricky = pickN(left.filter((w) => profile.tricky[w.word]), 3);
+        const fresh = freshPick(left.filter((w) => !tricky.includes(w)), n - tricky.length, byWord);
         return shuffle([...tricky, ...fresh]).map((w) => ({ ...w, target: w.word, hidden: true }));
       }
       case "tricky": {
@@ -237,13 +243,30 @@
   let game = null;
 
   function start(mode) {
+    game = null; // a new session must not see the last one's words as used
     const items = buildItems(mode);
     if (!items.length) return;
-    game = { mode, items, idx: 0, correct: 0, errors: 0, ms: 0, missed: new Set() };
+    game = { mode, items, idx: 0, correct: 0, errors: 0, ms: 0, missed: new Set(), firstTry: [], struggled: [], over: false };
+    if (MINUTES[mode]) game.endsAt = Date.now() + MINUTES[mode] * 60000;
     $("#modeTitle").textContent = TITLES[mode];
-    $("#trail").innerHTML = items.map(() => "<i></i>").join("");
+    $("#trail").innerHTML = game.endsAt ? '<i class="time"><b></b></i>' : items.map(() => "<i></i>").join("");
+    $("#clock").hidden = !game.endsAt;
     show("play");
+    tickClock();
     loadItem();
+  }
+
+  // Shows the time left, and ends a timed game at 0:00. A word that is half typed then isn't counted.
+  function tickClock() {
+    if (!game || !game.endsAt || game.over) return;
+    const left = Math.max(0, game.endsAt - Date.now());
+    const secs = Math.ceil(left / 1000);
+    const clock = $("#clock");
+    clock.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+    clock.classList.toggle("low", secs <= 60);
+    const bar = $("#trail .time b");
+    if (bar) bar.style.width = (left / (MINUTES[game.mode] * 60000)) * 100 + "%";
+    if (left <= 0 && !$("#play").hidden) finish();
   }
 
   function loadItem() {
@@ -252,7 +275,7 @@
     $("#msg").className = "msg";
     $("#msg").innerHTML = "";
     $("#line").className = "line" + (it.target.length > 24 ? " small" : "");
-    [...$("#trail").children].forEach((el, i) => { el.className = i < game.idx ? "done" : i === game.idx ? "now" : ""; });
+    if (!game.endsAt) [...$("#trail").children].forEach((el, i) => { el.className = i < game.idx ? "done" : i === game.idx ? "now" : ""; });
     renderCard(it);
     renderLine();
     if (it.hidden && !it.open) setTimeout(() => speak(it.word, it.sentence), 250);
@@ -384,6 +407,9 @@
     $("#line").classList.add("win");
     sfx.chime();
 
+    // Timed games count each word: right first try (no wrong key at all), or needed another try.
+    if (game.endsAt) (game.itemErr > 0 ? game.struggled : game.firstTry).push(it.word);
+
     if (it.word && game.mode !== "sentences") {
       if (game.itemErr > 0) {
         profile.tricky[it.word] = (profile.tricky[it.word] || 0) + 1;
@@ -410,13 +436,36 @@
   }
 
   function next() {
-    if (!game) return;
+    if (!game || game.over) return;
     game.idx++;
+    // A timed game never runs out of words: add another batch (if the level has any left).
+    if (game.endsAt && game.idx >= game.items.length) game.items.push(...buildItems(game.mode));
     if (game.idx >= game.items.length) finish();
     else loadItem();
   }
 
+  // Keeps a record of each timed session in the saved progress, newest last (at most 500).
+  function saveSession(finished) {
+    if (!game || !game.endsAt || game.saved) return;
+    game.saved = true;
+    const minutes = Math.round((Math.min(Date.now(), game.endsAt) - (game.endsAt - MINUTES[game.mode] * 60000)) / 60000);
+    if (!finished && !game.firstTry.length && !game.struggled.length) return; // left before doing anything
+    profile.sessions.push({
+      date: new Date().toISOString(), game: game.mode, level: currentBucket().name, minutes, finished,
+      firstTry: game.firstTry.length, struggled: game.struggled.length,
+      firstTryWords: game.firstTry, struggledWords: game.struggled,
+    });
+    profile.sessions = profile.sessions.slice(-500);
+    save();
+  }
+
   function finish() {
+    if (game.over) return;
+    game.over = true;
+    stopSpeech();
+    if (game.itemStart !== null) game.ms += performance.now() - game.itemStart; // time on the unfinished word
+    game.itemStart = null;
+    saveSession(true);
     const acc = accuracy();
     const speed = wpm(game.correct, game.ms);
     const stars = acc >= 95 ? 3 : acc >= 85 ? 2 : 1;
@@ -432,6 +481,10 @@
     $("#resWpm").textContent = speed;
     $("#resAcc").textContent = acc + "%";
     $("#resItems").textContent = game.items.length;
+    $("#resFirst").textContent = game.firstTry.length;
+    $("#resStruggled").textContent = game.struggled.length;
+    for (const id of ["#figFirst", "#figStruggled"]) $(id).hidden = !game.endsAt;
+    $("#figItems").hidden = !!game.endsAt;
     $("#resTricky").innerHTML = game.missed.size
       ? `<div class="label">Words to practise again</div><div class="tricky-list">${[...game.missed].map((w) => `<span>${escapeHtml(w)}</span>`).join("")}</div>`
       : "";
@@ -445,6 +498,7 @@
   }
 
   function renderHome() {
+    if (game && !game.over) saveSession(false); // left a timed game early: keep what was done
     game = null;
     stopSpeech();
     $("#name").value = profile.name;
@@ -520,8 +574,8 @@
   $("#clearBtn").addEventListener("click", () => { $("#clearBtn").hidden = true; $("#clearConfirm").hidden = false; });
   $("#clearNo").addEventListener("click", renderHome);
   $("#clearYes").addEventListener("click", () => {
-    // Keeps the name, level and sound setting; wipes scores and tricky words.
-    Object.assign(profile, { bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {} });
+    // Keeps the name, level and sound setting; wipes scores, tricky words and the session history.
+    Object.assign(profile, { bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [] });
     save();
     renderHome();
   });
@@ -577,7 +631,10 @@
     if ("hint" in b.dataset) $("#msg").innerHTML = `💡 <span class="rule">${escapeHtml(it.rule)}</span>`;
     b.blur();
   });
-  setInterval(() => { if (game && !$("#play").hidden && game.itemStart) updateLive(); }, 1000);
+  setInterval(() => {
+    if (game && !$("#play").hidden && game.itemStart) updateLive();
+    tickClock();
+  }, 1000);
 
   buildKeyboard();
   show("home");

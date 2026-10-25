@@ -189,6 +189,12 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .topbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .topbar .title { font: 700 1.3rem var(--font-display); letter-spacing: -0.01em; flex: 1; min-width: 0; }
 .topbar .live { color: var(--muted); font: 500 0.95rem var(--font-mono); font-variant-numeric: tabular-nums; }
+/* Countdown for timed games (Spelling Bee): mm:ss left, orange in the last minute. */
+.topbar .clock { font: 500 1.15rem var(--font-mono); font-variant-numeric: tabular-nums; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px 10px; }
+.topbar .clock.low { color: var(--koi); border-color: var(--koi); }
+/* In a timed game the trail is one bar that drains as time passes. */
+.trail i.time { background: var(--sunk); position: relative; overflow: hidden; }
+.trail i.time b { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 4px; transition: width 1s linear; }
 .ghost {
   background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 12px; padding: 7px 14px; font-weight: 600;
 }
@@ -279,7 +285,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .result h2 { font: 700 2rem var(--font-display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
 .stars { font-size: 3rem; letter-spacing: 0.15em; }
 .stars .off { filter: grayscale(1); opacity: .25; }
-.figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; max-width: 520px; }
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; width: 100%; max-width: 620px; }
 .figures div { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 8px; }
 .figures b { font: 700 2rem var(--font-display); font-variant-numeric: tabular-nums; color: var(--accent); }
 .figures span { font: 500 0.75rem var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
@@ -323,6 +329,12 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   .line.small { font-size: 1.3rem; }
   .levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .brand h1 { font-size: 2.1rem; }
+}
+/* Phones: the game title gets its own row, so Home, the clock, the live speed and sound fit on one row below it. */
+@media (max-width: 480px) {
+  .topbar { gap: 8px; }
+  .topbar .title { flex-basis: 100%; order: -1; }
+  .topbar .live { margin-left: auto; font-size: 0.85rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

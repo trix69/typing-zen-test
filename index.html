@@ -78,7 +78,7 @@
       <div class="modes">
         <button class="mode" disabled data-mode="warm"><span class="ico">⌨️</span><b>Warm-up</b><span>Home row and finger drills</span></button>
         <button class="mode" disabled data-mode="words"><span class="ico">🌼</span><b>Word Garden</b><span>Type a word and learn what it means</span></button>
-        <button class="mode" data-mode="spell"><span class="ico">🐝</span><b>Spelling Bee</b><span>Listen, then spell it from memory</span></button>
+        <button class="mode" data-mode="spell"><span class="ico">🐝</span><b>Spelling Bee</b><span>Spell as many words as you can in 20 minutes</span></button>
         <button class="mode" disabled data-mode="sentences"><span class="ico">🌊</span><b>Sentence Stream</b><span>Type whole sentences with capitals and full stops</span></button>
         <button class="mode" disabled data-mode="fixit"><span class="ico">🔧</span><b>Fix-It</b><span>Find the grammar mistake and type it correctly</span></button>
         <button class="mode" disabled data-mode="tricky" id="trickyBtn" hidden><span class="ico">🎯</span><b>Tricky Words</b><span id="trickyInfo">Words you found hard</span></button>
@@ -93,6 +93,7 @@
     <div class="topbar">
       <button class="ghost" id="backBtn">← Home</button>
       <div class="title" id="modeTitle"></div>
+      <div class="clock" id="clock" role="timer" aria-label="Time left" hidden></div>
       <div class="live"><span id="liveWpm">0</span> wpm · <span id="liveAcc">100</span>%</div>
       <button class="ghost sound" id="muteBtn"></button>
     </div>
@@ -114,9 +115,11 @@
       <div class="stars" id="stars"></div>
       <h2 id="resTitle">Round complete</h2>
       <div class="figures">
+        <div id="figFirst" hidden><b id="resFirst">0</b><span>right first try</span></div>
+        <div id="figStruggled" hidden><b id="resStruggled">0</b><span>needed another try</span></div>
         <div><b id="resWpm">0</b><span>words per minute</span></div>
         <div><b id="resAcc">0%</b><span>accuracy</span></div>
-        <div><b id="resItems">0</b><span>done</span></div>
+        <div id="figItems"><b id="resItems">0</b><span>done</span></div>
       </div>
       <div id="resTricky"></div>
       <div class="actions">
