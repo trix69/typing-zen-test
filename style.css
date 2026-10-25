@@ -143,12 +143,37 @@ kbd {
 .icon-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
 .hello { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.hello label { font-weight: 700; }
-.hello input {
-  font: 600 1.05rem var(--font-type); color: var(--fg);
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-  padding: 9px 12px; width: 220px; max-width: 100%;
+.hello-name { margin: 0; font-size: 1.1rem; }
+.hello-name b { font: 700 1.2rem var(--font-type); }
+
+/* Welcome screen: who is typing. A panel card with the questions, or the welcome-back choices. */
+.intro {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 24px;
+  display: flex; flex-direction: column; gap: 18px; max-width: 560px; width: 100%;
 }
+.intro h2 { margin: 0; font: 700 1.6rem/1.15 var(--font-display); letter-spacing: -0.02em; }
+.intro form { display: flex; flex-direction: column; gap: 18px; }
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field label, .field-label { margin: 0; font-weight: 700; }
+.field input {
+  font: 600 1.15rem var(--font-type); color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; max-width: 320px;
+}
+.field input::placeholder { color: var(--muted); opacity: .8; font-weight: 400; }
+.field input[aria-invalid="true"], .choices[aria-invalid="true"] button { border-color: var(--bad); }
+.field-error { margin: 0; color: var(--bad); font-weight: 600; font-size: 0.95rem; }
+.choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-width: 420px; }
+.choices button, .user-list .user {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg); font: 600 1rem var(--font-body);
+}
+.choices button { height: 44px; }
+.choices button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.choices button:hover, .user-list .user:hover { border-color: var(--accent); }
+.intro-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.user-list .user { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; text-align: left; }
+.user-list .user b { font: 700 1.2rem var(--font-type); }
+.user-list .user span { color: var(--muted); font-size: 0.85rem; }
 .history { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .history .stats { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
 .history .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 700; }
@@ -165,7 +190,8 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px;
   transition: border-color .15s;
 }
-.level:hover { border-color: var(--accent); }
+.level:hover:not(:disabled) { border-color: var(--accent); }
+.level:disabled { opacity: .45; filter: grayscale(1); cursor: not-allowed; }
 .level b { font: 700 1.25rem var(--font-display); letter-spacing: -0.01em; }
 .level span { font-size: 0.85rem; color: var(--muted); }
 .level[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }

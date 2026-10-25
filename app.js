@@ -15,15 +15,35 @@
   const PRAISE = ["Lovely!", "Brilliant!", "Smooth!", "Nice and calm.", "Great typing!", "Spot on!"];
 
   // ---------- Saved progress (per browser) ----------
-  const KEY = "typingZen.v1-test";
-  const profile = Object.assign(
-    { name: "Luke", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false },
-    (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })()
-  );
-  // Names start with a capital, and a blank name falls back to Luke.
-  const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : "Luke"; };
-  profile.name = tidyName(profile.name); // earlier visits may have saved "luke" or a blank name
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(profile)); } catch { /* storage unavailable */ } };
+  // Several people can use Typing Zen in one browser. typingZen.v2 holds { current, users: { id: profile } };
+  // `profile` is the current user's record. 1.0 kept one profile in typingZen.v1: on the first visit with
+  // this version it becomes the first user (v1 itself is left as it was).
+  const KEY = "typingZen.v2-test";
+  const OLD_KEY = "typingZen.v1-test";
+  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false });
+  // Names start with a capital letter. A blank name stays blank: the welcome form asks for one.
+  const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : ""; };
+  const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const store = (() => {
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.users) return s; } catch { /* start fresh */ }
+    const s = { current: null, users: {} };
+    try {
+      const old = JSON.parse(localStorage.getItem(OLD_KEY));
+      if (old && typeof old === "object") {
+        const id = newId();
+        s.users[id] = { ...DEFAULTS(), ...old, name: tidyName(old.name) || "Luke", id };
+        s.current = id;
+      }
+    } catch { /* nothing to bring over */ }
+    return s;
+  })();
+  for (const u of Object.values(store.users)) {
+    for (const [k, v] of Object.entries(DEFAULTS())) if (!(k in u)) u[k] = v;
+    // A 1.0 profile has no school year: take its level as the year (it can be changed in Settings).
+    if (!/^Y[1-6]$/.test(u.year)) u.year = /^Y[1-6]$/.test(u.bucket) ? u.bucket : "Y1";
+  }
+  let profile = store.users[store.current] || DEFAULTS(); // replaced by useProfile() once someone is chosen
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* storage unavailable */ } };
 
   // ---------- Keyboard model ----------
   // A full-size keyboard laid out like TypingClub's: every row is 15 key-widths wide,
@@ -161,7 +181,16 @@
     { name: "Y6", label: "Year 6", sample: "necessary, rhythm, conscience" },
   ];
   for (const b of BUCKETS) b.words = WORD_GROUPS.filter((g) => g.level === b.name).flatMap((g) => g.words);
-  const currentBucket = () => BUCKETS.find((b) => b.name === profile.bucket) || BUCKETS[0];
+  // A user's school year unlocks three levels: the year below, their year and the year above,
+  // kept inside Year 1 to Year 6 (Year 1: 1-3, Year 3: 2-4, Year 6: 4-6).
+  const unlocked = (year) => {
+    const from = Math.min(Math.max(+year.slice(1) - 1, 1), 4);
+    return [from, from + 1, from + 2].map((n) => "Y" + n);
+  };
+  const currentBucket = () =>
+    BUCKETS.find((b) => b.name === profile.bucket && unlocked(profile.year).includes(b.name)) ||
+    BUCKETS.find((b) => b.name === profile.year);
+  const yearLabel = (y) => BUCKETS.find((b) => b.name === y)?.label || "";
   const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   // Where the word sits in its sentence, matching whole words only (so "a" never matches inside "cat").
@@ -184,7 +213,7 @@
 
   // Picks n items, preferring the ones practised longest ago (never-seen first), so rounds rotate
   // through the whole level before repeating. profile.seen maps item key -> pick counter.
-  let seenTick = Math.max(0, ...Object.values(profile.seen));
+  let seenTick = 0; // set for each user in useProfile()
   function freshPick(list, n, key) {
     const picked = shuffle(list).sort((a, b) => (profile.seen[key(a)] || 0) - (profile.seen[key(b)] || 0)).slice(0, n);
     seenTick++;
@@ -508,8 +537,13 @@
     if (game && !game.over) saveSession(false); // left a timed game early: keep what was done
     game = null;
     stopSpeech();
-    $("#name").value = profile.name;
-    for (const b of document.querySelectorAll(".level")) b.setAttribute("aria-checked", String(b.dataset.bucket === currentBucket().name));
+    $("#userName").textContent = profile.name;
+    const open = unlocked(profile.year);
+    for (const b of document.querySelectorAll(".level")) {
+      b.disabled = !open.includes(b.dataset.bucket);
+      b.setAttribute("aria-checked", String(b.dataset.bucket === currentBucket().name));
+    }
+    $("#levelNote").textContent = `You're in ${yearLabel(profile.year)}, so you can practise ${yearLabel(open[0])} to ${yearLabel(open[2])}. Change your year in Settings.`;
     const parts = [];
     if (profile.rounds) parts.push(`⭐ ${profile.stars} stars`, `🏃 best ${profile.bestWpm} wpm`, `${profile.rounds} rounds played`);
     $("#homeStats").textContent = parts.length ? parts.join("   ·   ") : "Pick a level and a game to begin.";
@@ -538,7 +572,7 @@
 
   // ---------- Events ----------
   document.addEventListener("keydown", (e) => {
-    if (e.target.id === "name") return;
+    if (e.target.tagName === "INPUT") return; // typing a name on the welcome screen
     const playing = !$("#play").hidden;
     if (!$("#results").hidden && e.key === "Enter") { e.preventDefault(); return start(game.mode); }
     if (!$("#results").hidden && e.key === "Escape") return show("home");
@@ -568,14 +602,12 @@
     msg.innerHTML = `Leave this round? Press <kbd>Esc</kbd> again to go home, or keep typing to stay.`;
   }
 
-  $("#name").addEventListener("input", (e) => { profile.name = tidyName(e.target.value); save(); });
-  $("#name").addEventListener("change", (e) => { e.target.value = profile.name; });
-  $("#name").addEventListener("keydown", (e) => { if (e.key === "Enter") e.target.blur(); });
+  $("#switchUserBtn").addEventListener("click", () => showPanel("switch"));
   $("#levels").innerHTML = BUCKETS.map((b) =>
     `<button class="level" data-bucket="${b.name}" role="radio"><b>${b.label}</b><span>${b.words.length} words, like ${b.sample}</span></button>`).join("");
   $("#levels").addEventListener("click", (e) => {
     const b = e.target.closest(".level");
-    if (b) { profile.bucket = b.dataset.bucket; save(); renderHome(); }
+    if (b && !b.disabled) { profile.bucket = b.dataset.bucket; save(); renderHome(); }
   });
   document.querySelectorAll(".mode").forEach((b) => b.addEventListener("click", () => { b.blur(); start(b.dataset.mode); }));
   $("#clearBtn").addEventListener("click", () => { $("#clearBtn").hidden = true; $("#clearConfirm").hidden = false; });
@@ -588,10 +620,12 @@
   });
   // ---------- Settings ----------
   // Appearance is Light, Dark or Automatic. THEME (set up in index.html's <head>) saves it to
-  // typingZen.theme, apart from the progress in typingZen.v1.
+  // typingZen.theme, apart from the progress in typingZen.v2. Your year is the current user's school
+  // year: it sets which three levels are open.
   const sheet = $("#sheet");
   function syncSheet() {
     for (const b of $("#segApp").children) b.setAttribute("aria-checked", String(b.dataset.themeMode === THEME.mode));
+    for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
   }
   function openSheet() {
     syncSheet();
@@ -620,6 +654,17 @@
     const b = e.target.closest("button");
     if (b) { THEME.set(b.dataset.themeMode); syncSheet(); }
   });
+  $("#segYear").innerHTML = BUCKETS.map((b) => `<button type="button" role="radio" aria-checked="false" data-year="${b.name}">${b.label}</button>`).join("");
+  $("#segYear").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    profile.year = b.dataset.year;
+    // Keep the chosen level if it's still open, otherwise practise the new year.
+    if (!unlocked(profile.year).includes(profile.bucket)) profile.bucket = profile.year;
+    save();
+    syncSheet();
+    renderHome();
+  });
 
   $("#backBtn").addEventListener("click", () => show("home"));
   $("#homeBtn").addEventListener("click", () => show("home"));
@@ -643,6 +688,84 @@
     tickClock();
   }, 1000);
 
+  // ---------- Who's typing: welcome, new user, switch user ----------
+  // First visit: two questions, name and year. Every later visit opens on "Welcome back" with
+  // Continue, Switch user and I'm new here (like Violin Toolkit's start overlay).
+  const users = () => Object.values(store.users).sort((a, b) => (b.lastUsed || "").localeCompare(a.lastUsed || ""));
+  let newYear = null;
+
+  function showWelcome() {
+    const last = store.users[store.current];
+    if (!last) return showPanel("new");
+    $("#backName").textContent = last.name;
+    $("#continueBtn").textContent = `Continue as ${last.name}`;
+    showPanel("back");
+  }
+  function showPanel(which) {
+    show("welcome");
+    for (const id of ["new", "back", "switch"]) $("#intro-" + id).hidden = id !== which;
+    if (which === "new") {
+      $("#newName").value = "";
+      newYear = null;
+      for (const b of $("#newYear").children) b.setAttribute("aria-checked", "false");
+      setError("name", "");
+      setError("year", "");
+      $("#newBack").hidden = !users().length;
+      $("#newName").focus();
+    } else if (which === "switch") {
+      $("#userList").innerHTML = users().map((u) =>
+        `<button type="button" class="user" data-id="${u.id}"><b>${escapeHtml(u.name)}</b><span>${yearLabel(u.year)}</span></button>`).join("");
+      $("#userList button")?.focus();
+    } else {
+      $("#continueBtn").focus();
+    }
+  }
+  function useProfile(id) {
+    store.current = id;
+    profile = store.users[id];
+    profile.lastUsed = new Date().toISOString();
+    seenTick = Math.max(0, ...Object.values(profile.seen));
+    save();
+    show("home");
+  }
+  // Shows (or with "" clears) the message under a question, and marks the field for screen readers.
+  function setError(field, text) {
+    const el = $(`#${field}Err`);
+    el.textContent = text;
+    el.hidden = !text;
+    (field === "name" ? $("#newName") : $("#newYear")).setAttribute("aria-invalid", String(!!text));
+  }
+
+  $("#newYear").innerHTML = BUCKETS.map((b) => `<button type="button" role="radio" aria-checked="false" data-year="${b.name}">${b.label}</button>`).join("");
+  $("#newYear").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    newYear = b.dataset.year;
+    for (const x of $("#newYear").children) x.setAttribute("aria-checked", String(x === b));
+    setError("year", "");
+  });
+  $("#newName").addEventListener("input", () => setError("name", ""));
+  $("#newForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = tidyName($("#newName").value);
+    const taken = name && users().find((u) => u.name.toLowerCase() === name.toLowerCase());
+    setError("name", !name ? "Please type your name. It's needed to keep your progress."
+      : taken ? `${taken.name} already uses Typing Zen here. Go back and choose Switch user.` : "");
+    setError("year", newYear ? "" : "Please choose your year.");
+    if (!name || taken) return $("#newName").focus();
+    if (!newYear) return $("#newYear button").focus();
+    const id = newId();
+    store.users[id] = { ...DEFAULTS(), name, year: newYear, bucket: newYear, id, created: new Date().toISOString() };
+    useProfile(id);
+  });
+  $("#newBack").addEventListener("click", showWelcome);
+  $("#continueBtn").addEventListener("click", () => useProfile(store.current));
+  $("#switchBtn").addEventListener("click", () => showPanel("switch"));
+  $("#newBtn").addEventListener("click", () => showPanel("new"));
+  $("#switchNew").addEventListener("click", () => showPanel("new"));
+  $("#switchBack").addEventListener("click", showWelcome);
+  $("#userList").addEventListener("click", (e) => { const b = e.target.closest(".user"); if (b) useProfile(b.dataset.id); });
+
   buildKeyboard();
-  show("home");
+  showWelcome();
 })();

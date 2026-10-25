@@ -43,6 +43,55 @@
 <style>.test-ribbon { position: fixed; z-index: 300; top: 0; left: 50%; transform: translateX(-50%); padding: 2px 10px; border-radius: 0 0 8px 8px; background: #c2410c; color: #fff; font: 700 11px/1.4 ui-monospace, monospace; letter-spacing: .1em; pointer-events: none; }</style>
 <div class="app">
 
+  <!-- WELCOME: who is typing (first visit: name and year; later: welcome back) -->
+  <section id="welcome" class="screen" hidden>
+    <header class="brand">
+      <div class="pebbles" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="brand-text">
+        <h1>Typing Zen</h1>
+        <p class="tag">Calm fingers, clever words.</p>
+      </div>
+    </header>
+
+    <div class="intro" id="intro-new" hidden>
+      <h2>Hello! Let's get you set up</h2>
+      <form id="newForm" novalidate>
+        <div class="field">
+          <label for="newName">What's your name?</label>
+          <input id="newName" type="text" maxlength="20" autocomplete="off" placeholder="e.g. Luke" required aria-required="true" aria-describedby="nameErr">
+          <p class="field-error" id="nameErr" role="alert" hidden></p>
+        </div>
+        <div class="field">
+          <p class="field-label" id="yearLabel">Which year are you in?</p>
+          <div class="choices" id="newYear" role="radiogroup" aria-labelledby="yearLabel" aria-required="true" aria-describedby="yearErr"></div>
+          <p class="field-error" id="yearErr" role="alert" hidden></p>
+        </div>
+        <div class="intro-actions">
+          <button type="submit" class="primary">Let's start</button>
+          <button type="button" class="ghost" id="newBack" hidden>Back</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="intro" id="intro-back" hidden>
+      <h2>Welcome back, <span id="backName"></span>!</h2>
+      <div class="intro-actions">
+        <button type="button" class="primary" id="continueBtn">Continue</button>
+        <button type="button" class="ghost" id="switchBtn">Switch user</button>
+        <button type="button" class="ghost" id="newBtn">I'm new here</button>
+      </div>
+    </div>
+
+    <div class="intro" id="intro-switch" hidden>
+      <h2>Who's typing?</h2>
+      <div class="user-list" id="userList"></div>
+      <div class="intro-actions">
+        <button type="button" class="ghost" id="switchNew">I'm new here</button>
+        <button type="button" class="ghost" id="switchBack">Back</button>
+      </div>
+    </div>
+  </section>
+
   <!-- HOME -->
   <section id="home" class="screen">
     <header class="brand">
@@ -55,8 +104,8 @@
     </header>
 
     <div class="hello">
-      <label for="name">Your name</label>
-      <input id="name" type="text" maxlength="20" autocomplete="off" placeholder="Type your name">
+      <p class="hello-name">Hi, <b id="userName"></b></p>
+      <button type="button" class="ghost small" id="switchUserBtn">Switch user</button>
       <div class="history">
         <p class="stats" id="homeStats"></p>
         <button class="ghost small" id="clearBtn" hidden>Clear history</button>
@@ -71,6 +120,7 @@
     <div class="block">
       <h2 class="label">Spelling level</h2>
       <div class="levels" id="levels" role="radiogroup" aria-label="Spelling level"></div>
+      <p class="note" id="levelNote"></p>
     </div>
 
     <div class="block">
@@ -135,6 +185,8 @@
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
   <div class="sheet-card" id="sheetCard" tabindex="-1">
     <h2 id="sheetTitle">Settings</h2>
+    <h3 id="lblYear">Your year</h3>
+    <div class="choices" role="radiogroup" aria-labelledby="lblYear" id="segYear"></div>
     <h3 id="lblApp">Appearance</h3>
     <div class="segc" role="radiogroup" aria-labelledby="lblApp" id="segApp">
       <button type="button" role="radio" aria-checked="false" data-theme-mode="light">Light</button>
