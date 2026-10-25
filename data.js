@@ -1,0 +1,51 @@
+// Typing Zen content. UK spelling throughout.
+// The spelling words live in words.js, built from the spreadsheet in wordlist/.
+// Each fix-it: the sentence with a mistake, the corrected sentence, and the rule.
+const FIXITS = [
+  { tag: "Capital letters", wrong: "my dog is called max.", right: "My dog is called Max.", rule: "Sentences and names start with a capital letter." },
+  { tag: "Capital letters", wrong: "we went to london on monday.", right: "We went to London on Monday.", rule: "Places and days of the week need capital letters." },
+  { tag: "Capital letters", wrong: "On Saturday, Sam and i baked a cake.", right: "On Saturday, Sam and I baked a cake.", rule: "The word I is always a capital letter." },
+  { tag: "End punctuation", wrong: "Where is my red pencil.", right: "Where is my red pencil?", rule: "A question ends with a question mark." },
+  { tag: "End punctuation", wrong: "Can you help me", right: "Can you help me?", rule: "A question ends with a question mark." },
+  { tag: "End punctuation", wrong: "The bus was late", right: "The bus was late.", rule: "A statement ends with a full stop." },
+  { tag: "End punctuation", wrong: "What a huge wave that was.", right: "What a huge wave that was!", rule: "An exclamation starting with What or How ends with an exclamation mark." },
+  { tag: "Verb agreement", wrong: "The dogs is barking loudly.", right: "The dogs are barking loudly.", rule: "Use is for one thing and are for more than one." },
+  { tag: "Verb agreement", wrong: "She play football every day.", right: "She plays football every day.", rule: "With he, she or it, the verb usually ends in s." },
+  { tag: "Verb agreement", wrong: "We was going to the park.", right: "We were going to the park.", rule: "Say we were, you were and they were." },
+  { tag: "Verb agreement", wrong: "My brother don't like peas.", right: "My brother doesn't like peas.", rule: "With he, she or it, use doesn't instead of don't." },
+  { tag: "Past tense", wrong: "Yesterday I goed to the shop.", right: "Yesterday I went to the shop.", rule: "Go is irregular. Its past tense is went." },
+  { tag: "Past tense", wrong: "Last night we eated pizza.", right: "Last night we ate pizza.", rule: "Eat is irregular. Its past tense is ate." },
+  { tag: "Past tense", wrong: "He runned all the way home.", right: "He ran all the way home.", rule: "Run is irregular. Its past tense is ran." },
+  { tag: "Past tense", wrong: "I seen a fox in the garden.", right: "I saw a fox in the garden.", rule: "Say I saw. Seen needs a helper, as in I have seen." },
+  { tag: "A or an", wrong: "I ate a apple at lunch.", right: "I ate an apple at lunch.", rule: "Use an before a word that starts with a vowel sound." },
+  { tag: "A or an", wrong: "We saw a elephant at the zoo.", right: "We saw an elephant at the zoo.", rule: "Use an before a word that starts with a vowel sound." },
+  { tag: "Homophones", wrong: "Their is a cat on the roof.", right: "There is a cat on the roof.", rule: "There tells you about a place. Their means it belongs to them." },
+  { tag: "Homophones", wrong: "The children put on there coats.", right: "The children put on their coats.", rule: "Their means it belongs to them." },
+  { tag: "Homophones", wrong: "I want to come to.", right: "I want to come too.", rule: "Too means also, or more than enough." },
+  { tag: "Homophones", wrong: "Your my best friend.", right: "You're my best friend.", rule: "You're is short for you are. Your means it belongs to you." },
+  { tag: "Apostrophes", wrong: "The dogs bone was buried.", right: "The dog's bone was buried.", rule: "An apostrophe and s show that something belongs to someone." },
+  { tag: "Apostrophes", wrong: "I cant find my shoes.", right: "I can't find my shoes.", rule: "Can't is short for cannot. The apostrophe shows where letters are missing." },
+  { tag: "Apostrophes", wrong: "Its raining outside.", right: "It's raining outside.", rule: "It's is short for it is." },
+  { tag: "Commas in lists", wrong: "I packed a hat a scarf and gloves.", right: "I packed a hat, a scarf and gloves.", rule: "Use commas to separate the items in a list." },
+  { tag: "Commas in lists", wrong: "We need eggs flour and milk.", right: "We need eggs, flour and milk.", rule: "Use commas to separate the items in a list." },
+  { tag: "Comparing", wrong: "My kite is more bigger than yours.", right: "My kite is bigger than yours.", rule: "Use bigger or more big, never both. Bigger is the right one here." },
+  { tag: "Negatives", wrong: "I don't have no homework.", right: "I don't have any homework.", rule: "Use only one no-word in a sentence. Don't have any is correct." },
+];
+
+// Warm-up material. app.js builds a fresh random drill from these every time (see makeWarmup).
+const WARMUP = {
+  homeWords: ["ask", "all", "add", "dad", "sad", "lad", "has", "had", "gas", "jag", "lag", "fall", "hall", "half",
+    "glad", "flask", "flash", "salad", "shall", "slash", "dash", "lash", "gash", "hash", "sash", "glass", "alas", "lass"],
+  topWords: ["we", "you", "your", "were", "type", "tree", "pour", "poet", "pretty", "power", "quiet", "quote", "tower",
+    "write", "route", "outer", "rope", "pipe", "tip", "top", "yet", "wet", "wire", "tire", "trot", "puppet", "otter"],
+  bottomWords: ["zoom", "zip", "van", "man", "can", "cab", "box", "mix", "next", "moon", "bean", "comb", "climb",
+    "brave", "clever", "cubs", "buzz", "zebra", "number", "member", "cave", "move", "mice", "venom"],
+  names: ["Luke", "Ava", "Max", "Zoe", "Tom", "Mia", "Leo", "Ivy", "Sam", "Eva", "Ben", "Isla", "Jack", "Lily",
+    "Oscar", "Ruby", "Noah", "Ella", "Finn", "Grace", "London", "Paris", "Monday", "Friday", "April", "June"],
+  phrases: ["Yes, I can!", "Can you see it?", "Stop, look and listen.", "Ready, steady, go!", "Who is there?",
+    "Oh no, not again!", "It's my turn.", "I can't wait!", "Let's go home.", "What time is it?",
+    "Red, blue and green.", "Wow, that's fast!", "Is it lunch yet?", "Well done, team!"],
+  pangrams: ["the quick brown fox jumps over the lazy dog", "pack my box with five dozen liquor jugs",
+    "how vexingly quick daft zebras jump", "the five boxing wizards jump quickly",
+    "jackdaws love my big sphinx of quartz", "sphinx of black quartz, judge my vow"],
+};

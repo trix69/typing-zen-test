@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Typing Zen (Test)</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="A calm typing game for practising touch typing, spelling, word meanings and grammar.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg fill='%232f6f4a'%3E%3Cellipse cx='13' cy='38' rx='10' ry='7.5' opacity='.55'/%3E%3Cellipse cx='34' cy='35' rx='14' ry='10.5'/%3E%3Cellipse cx='55' cy='40' rx='7.5' ry='5.5' opacity='.35'/%3E%3C/g%3E%3C/svg%3E">
+<meta name="theme-color" content="#ffffff">
+<script>
+// Theme, set before the page draws so the wrong one never flashes. Saved apart from progress
+// (typingZen.v1) under typingZen.theme: "light", "dark" or "auto" (the default, follows the device).
+(function () {
+  var root = document.documentElement, mode = "auto";
+  try { var s = localStorage.getItem("typingZen.theme"); if (s === "light" || s === "dark") mode = s; } catch (e) {}
+  window.THEME = {
+    mode: mode,
+    set: function (m) {
+      this.mode = m;
+      try { localStorage.setItem("typingZen.theme", m); } catch (e) {}
+      this.apply();
+    },
+    apply: function () {
+      if (this.mode === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", this.mode);
+      this.bar();
+    },
+    // The phone's status bar takes the page background, so it matches light or dark.
+    bar: function () {
+      var m = document.querySelector('meta[name="theme-color"]');
+      var dark = this.mode === "dark" || (this.mode === "auto" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+      if (m) m.content = dark ? "#111613" : "#ffffff";
+    }
+  };
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { window.THEME.bar(); }); } catch (e) {}
+  window.THEME.apply();
+})();
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="test-ribbon" aria-hidden="true">TEST</div>
+<style>.test-ribbon { position: fixed; z-index: 300; top: 0; left: 50%; transform: translateX(-50%); padding: 2px 10px; border-radius: 0 0 8px 8px; background: #c2410c; color: #fff; font: 700 11px/1.4 ui-monospace, monospace; letter-spacing: .1em; pointer-events: none; }</style>
+<div class="app">
+
+  <!-- HOME -->
+  <section id="home" class="screen">
+    <header class="brand">
+      <div class="pebbles" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="brand-text">
+        <h1>Typing Zen</h1>
+        <p class="tag">Calm fingers, clever words.</p>
+      </div>
+      <button type="button" class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    </header>
+
+    <div class="hello">
+      <label for="name">Your name</label>
+      <input id="name" type="text" maxlength="20" autocomplete="off" placeholder="Type your name">
+      <div class="history">
+        <p class="stats" id="homeStats"></p>
+        <button class="ghost small" id="clearBtn" hidden>Clear history</button>
+        <span class="confirm" id="clearConfirm" hidden>
+          Clear all stars, best speed and tricky words?
+          <button class="danger small" id="clearYes">Yes, clear</button>
+          <button class="ghost small" id="clearNo">Cancel</button>
+        </span>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2 class="label">Spelling level</h2>
+      <div class="levels" id="levels" role="radiogroup" aria-label="Spelling level"></div>
+    </div>
+
+    <div class="block">
+      <h2 class="label">Choose a game</h2>
+      <div class="modes">
+        <button class="mode" disabled data-mode="warm"><span class="ico">⌨️</span><b>Warm-up</b><span>Home row and finger drills</span></button>
+        <button class="mode" disabled data-mode="words"><span class="ico">🌼</span><b>Word Garden</b><span>Type a word and learn what it means</span></button>
+        <button class="mode" data-mode="spell"><span class="ico">🐝</span><b>Spelling Bee</b><span>Listen, then spell it from memory</span></button>
+        <button class="mode" disabled data-mode="sentences"><span class="ico">🌊</span><b>Sentence Stream</b><span>Type whole sentences with capitals and full stops</span></button>
+        <button class="mode" disabled data-mode="fixit"><span class="ico">🔧</span><b>Fix-It</b><span>Find the grammar mistake and type it correctly</span></button>
+        <button class="mode" disabled data-mode="tricky" id="trickyBtn" hidden><span class="ico">🎯</span><b>Tricky Words</b><span id="trickyInfo">Words you found hard</span></button>
+      </div>
+    </div>
+
+    <p class="note">Works best with a real keyboard. Press <kbd>Esc</kbd> twice during a game to come back here.</p>
+  </section>
+
+  <!-- PLAY -->
+  <section id="play" class="screen" hidden>
+    <div class="topbar">
+      <button class="ghost" id="backBtn">← Home</button>
+      <div class="title" id="modeTitle"></div>
+      <div class="live"><span id="liveWpm">0</span> wpm · <span id="liveAcc">100</span>%</div>
+      <button class="ghost sound" id="muteBtn"></button>
+    </div>
+    <div class="trail" id="trail" aria-label="Progress"></div>
+
+    <div class="stage">
+      <div class="card" id="card"></div>
+      <div class="line" id="line"></div>
+      <div class="msg" id="msg" aria-live="polite"></div>
+    </div>
+
+    <div class="finger" id="finger"></div>
+    <div class="kbd" id="kbd" aria-hidden="true"></div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="results" class="screen" hidden>
+    <div class="result">
+      <div class="stars" id="stars"></div>
+      <h2 id="resTitle">Round complete</h2>
+      <div class="figures">
+        <div><b id="resWpm">0</b><span>words per minute</span></div>
+        <div><b id="resAcc">0%</b><span>accuracy</span></div>
+        <div><b id="resItems">0</b><span>done</span></div>
+      </div>
+      <div id="resTricky"></div>
+      <div class="actions">
+        <button class="primary" id="againBtn">Play again <kbd>Enter</kbd></button>
+        <button class="ghost" id="homeBtn">Home <kbd>Esc</kbd></button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- SETTINGS -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-card" id="sheetCard" tabindex="-1">
+    <h2 id="sheetTitle">Settings</h2>
+    <h3 id="lblApp">Appearance</h3>
+    <div class="segc" role="radiogroup" aria-labelledby="lblApp" id="segApp">
+      <button type="button" role="radio" aria-checked="false" data-theme-mode="light">Light</button>
+      <button type="button" role="radio" aria-checked="false" data-theme-mode="dark">Dark</button>
+      <button type="button" role="radio" aria-checked="false" data-theme-mode="auto">Automatic</button>
+    </div>
+    <p class="ver">Version <span id="appVersion">1.01-test</span></p>
+    <button type="button" class="sheet-done" id="sheetDone">Done</button>
+  </div>
+</div>
+<script src="words.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

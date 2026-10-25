@@ -1,0 +1,330 @@
+/* Layout: one calm column; the typing line is the centrepiece, keyboard beneath like a raked-sand bed. */
+
+/* Fonts are self-hosted in fonts/ (SIL Open Font License, see the OFL files there), so nothing loads from Google.
+   Outfit for headings, DM Sans for body text, DM Mono for small labels and numbers (as in Violin Toolkit), and
+   Atkinson Hyperlegible for the letters Luke types and reads, because its I and l look different. */
+@font-face { font-family: "Outfit"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("fonts/outfit-latin-wght-normal.woff2") format("woff2"); }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 100 1000; font-display: swap; src: url("fonts/dm-sans-latin-wght-normal.woff2") format("woff2"); }
+@font-face { font-family: "DM Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/dm-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "DM Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/dm-mono-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 700; font-display: swap; src: url("fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); }
+
+/* Colour tokens, named as in Violin Toolkit. Light is the default; the theme script in index.html sets
+   data-theme="light" or "dark" on <html>, and Automatic (no attribute) follows the device. */
+:root {
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #555b61;
+  --panel: #f6f7f8;
+  --sunk: #e4e7ea;
+  --line: #d3d8dd;
+  --accent: #2f6f4a;
+  --on-accent: #ffffff;
+  --koi: #d9693c;
+  --ok: #1f7a45;
+  --bad: #c2463f;
+  --scrim: rgba(17, 24, 20, .45);
+  --f-pinky: #f4f0fc;
+  --f-ring: #edf5fd;
+  --f-middle: #eef8f1;
+  --f-index: #fef5e8;
+  --f-thumb: #f3f4f6;
+  /* Keys are near-white with a strong finger-coloured border: Luke's monitor turns mid-tone pastels grey or dark lower down the screen, but shows near-white and strong colours reliably. */
+  --e-pinky: #7f56cf;
+  --e-ring: #2f84d0;
+  --e-middle: #2f9a4f;
+  --e-index: #e08a1a;
+  --e-thumb: #8a939b;
+  --font-display: "Outfit", "Trebuchet MS", sans-serif;
+  --font-body: "DM Sans", system-ui, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, Menlo, monospace;
+  --font-type: "Atkinson Hyperlegible", "Verdana", sans-serif;
+  --r: 18px;
+  color-scheme: light;
+}
+/* Dark keys keep the same idea: a calm fill with a strong, bright finger-coloured edge. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111613;
+    --fg: #e6ece8;
+    --muted: #9eaaa3;
+    --panel: #1a211d;
+    --sunk: #29322d;
+    --line: #34403a;
+    --accent: #6fbf8f;
+    --on-accent: #0e1512;
+    --koi: #f08a5d;
+    --ok: #63c98d;
+    --bad: #f0786f;
+    --scrim: rgba(0, 0, 0, .6);
+    --f-pinky: #221d30;
+    --f-ring: #172532;
+    --f-middle: #172a1f;
+    --f-index: #2e2517;
+    --f-thumb: #232729;
+    --e-pinky: #a98bf2;
+    --e-ring: #5eabef;
+    --e-middle: #55c477;
+    --e-index: #f0a541;
+    --e-thumb: #8f99a2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111613;
+  --fg: #e6ece8;
+  --muted: #9eaaa3;
+  --panel: #1a211d;
+  --sunk: #29322d;
+  --line: #34403a;
+  --accent: #6fbf8f;
+  --on-accent: #0e1512;
+  --koi: #f08a5d;
+  --ok: #63c98d;
+  --bad: #f0786f;
+  --scrim: rgba(0, 0, 0, .6);
+  --f-pinky: #221d30;
+  --f-ring: #172532;
+  --f-middle: #172a1f;
+  --f-index: #2e2517;
+  --f-thumb: #232729;
+  --e-pinky: #a98bf2;
+  --e-ring: #5eabef;
+  --e-middle: #55c477;
+  --e-index: #f0a541;
+  --e-thumb: #8f99a2;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 var(--font-body);
+}
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+kbd {
+  font: 500 0.8em var(--font-mono);
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-bottom-width: 3px;
+  border-radius: 6px; padding: 0 6px;
+}
+
+.app {
+  max-width: 920px;
+  margin: 0 auto;
+  padding-block: 24px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.screen { display: flex; flex-direction: column; gap: 24px; }
+
+/* Home */
+.brand { display: flex; align-items: center; gap: 16px; }
+.brand-text { flex: 1; min-width: 0; }
+.brand h1 { font: 700 2.6rem/1 var(--font-display); margin: 0; letter-spacing: -0.02em; color: var(--accent); }
+.brand .tag { margin: 4px 0 0; color: var(--muted); }
+.pebbles { display: flex; align-items: flex-end; gap: 3px; }
+.pebbles i { display: block; background: var(--accent); border-radius: 50%; }
+.pebbles i:nth-child(1) { width: 18px; height: 13px; opacity: .55; }
+.pebbles i:nth-child(2) { width: 26px; height: 19px; }
+.pebbles i:nth-child(3) { width: 14px; height: 10px; opacity: .35; }
+
+/* Square icon button, like Violin Toolkit's tabs (used for the Settings gear). */
+.icon-btn {
+  flex: none; width: 44px; height: 44px; padding: 0; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--fg);
+}
+.icon-btn:hover { border-color: var(--accent); }
+.icon-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+.hello { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.hello label { font-weight: 700; }
+.hello input {
+  font: 600 1.05rem var(--font-type); color: var(--fg);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 9px 12px; width: 220px; max-width: 100%;
+}
+.history { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.history .stats { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+.history .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 700; }
+button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
+.danger { background: var(--bad); color: var(--bg); border: 1px solid var(--bad); font-weight: 700; }
+
+.block { display: flex; flex-direction: column; gap: 10px; }
+.label { font: 500 0.75rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 0; }
+
+/* Panels: level and game cards share Violin Toolkit's panel look (1px line, rounded, accent on hover). */
+.levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.level {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px;
+  transition: border-color .15s;
+}
+.level:hover { border-color: var(--accent); }
+.level b { font: 700 1.25rem var(--font-display); letter-spacing: -0.01em; }
+.level span { font-size: 0.85rem; color: var(--muted); }
+.level[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+.card .why { font-size: 0.95rem; color: var(--koi); font-weight: 700; }
+
+.modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.mode {
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 12px;
+  align-items: center; text-align: left;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px;
+  transition: transform .15s, border-color .15s;
+}
+.mode:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-2px); }
+.mode:disabled { opacity: .45; filter: grayscale(1); cursor: not-allowed; }
+.mode .ico { grid-row: span 2; font-size: 2rem; }
+.mode b { font: 700 1.25rem var(--font-display); letter-spacing: -0.01em; }
+.mode span:last-child { font-size: 0.9rem; color: var(--muted); }
+.note { color: var(--muted); font-size: 0.9rem; margin: 0; }
+
+/* Play */
+.topbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.topbar .title { font: 700 1.3rem var(--font-display); letter-spacing: -0.01em; flex: 1; min-width: 0; }
+.topbar .live { color: var(--muted); font: 500 0.95rem var(--font-mono); font-variant-numeric: tabular-nums; }
+.ghost {
+  background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 12px; padding: 7px 14px; font-weight: 600;
+}
+.ghost:hover { border-color: var(--accent); }
+.sound { display: grid; place-items: center; padding: 5px 9px; color: var(--ok); }
+.sound svg { width: 26px; height: 26px; display: block; }
+.sound.muted { color: var(--bad); }
+.primary {
+  background: var(--accent); color: var(--on-accent); border: 0; border-radius: 12px; padding: 11px 22px;
+  font: 700 1.15rem var(--font-body);
+}
+.primary kbd { margin-left: 6px; }
+
+.trail { display: flex; gap: 6px; }
+.trail i { flex: 1; height: 8px; border-radius: 4px; background: var(--sunk); transition: background .3s; }
+.trail i.done { background: var(--accent); }
+.trail i.now { background: var(--koi); }
+
+.stage {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 28px 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 18px; min-height: 260px; justify-content: center;
+}
+.card { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; max-width: 60ch; }
+.card .emoji { font-size: 3.2rem; line-height: 1; }
+.card .meaning { font-size: 1.15rem; color: var(--muted); }
+.card .meaning b { color: var(--fg); }
+.card .clue { font: 1.15rem var(--font-type); color: var(--muted); }
+.card .tagline { font: 500 0.75rem var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--koi); }
+.card .wrong { font: 1.6rem/1.4 var(--font-type); text-decoration: underline wavy var(--bad); text-decoration-thickness: 1px; text-underline-offset: 6px; }
+.card .tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.card .tools button { font-size: 0.95rem; padding: 5px 12px; }
+
+.line {
+  font: 2.3rem/1.5 var(--font-type); letter-spacing: 0.02em; text-align: center;
+  max-width: 100%; overflow-wrap: anywhere; min-height: 1.5em;
+}
+.line.small { font-size: 1.7rem; }
+.line span { position: relative; white-space: pre; }
+.line .todo { color: var(--muted); opacity: .78; }
+.line .done { color: var(--ok); }
+.line .vocab { text-decoration: underline 3px var(--koi); text-underline-offset: 8px; }
+.line .cur { color: var(--fg); opacity: 1; background: color-mix(in srgb, var(--koi) 22%, transparent); border-radius: 4px; box-shadow: inset 0 -4px 0 var(--koi); }
+.line .blank { color: var(--muted); }
+.line .hint { color: var(--koi); opacity: .7; }
+.line .caret { display: inline-block; width: 3px; height: 1.1em; background: var(--koi); vertical-align: -0.15em; animation: blink 1s steps(1) infinite; }
+.line.shake { animation: shake .25s; }
+.line.win .done { color: var(--accent); }
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+.msg { min-height: 1.6em; text-align: center; font-weight: 700; color: var(--muted); max-width: 60ch; }
+.msg.good { color: var(--ok); }
+.msg .rule { display: block; font-weight: 600; color: var(--fg); margin-top: 4px; }
+
+.finger { text-align: center; color: var(--muted); font-weight: 700; min-height: 1.5em; }
+
+/* On-screen keyboard */
+.kbd { --u: min(52px, calc((100vw - 32px) / 15)); --kh: 46px; display: flex; flex-direction: column; gap: 6px; align-items: center; user-select: none; }
+.kbd .row { display: flex; gap: 6px; }
+.kbd .key {
+  width: calc(var(--u) * var(--w, 1) - 6px); height: var(--kh); border-radius: 9px; display: grid; place-items: center;
+  font: 700 1.05rem var(--font-type); color: var(--fg);
+  /* Even border plus a shadow for the raised bottom edge. A thicker border-bottom on rounded keys made
+     Chrome on Luke's Mac fill the lower rows solid with the border colour. */
+  --edge: var(--line); border: 3px solid var(--edge); box-shadow: 0 3px 0 var(--edge); margin-bottom: 3px; position: relative;
+  transition: transform .08s, background .15s;
+}
+.kbd .key.named { place-items: end start; padding: 0 0 5px 8px; font: 400 0.75rem var(--font-body); color: var(--muted); }
+.kbd .key.bump::after { content: ""; position: absolute; bottom: 7px; left: calc(50% - 6px); width: 12px; height: 2px; border-radius: 2px; background: var(--muted); }
+.kbd .mod { background: var(--panel); }
+.kbd .pinky { background: var(--f-pinky); --edge: var(--e-pinky); }
+.kbd .ring { background: var(--f-ring); --edge: var(--e-ring); }
+.kbd .middle { background: var(--f-middle); --edge: var(--e-middle); }
+.kbd .index { background: var(--f-index); --edge: var(--e-index); }
+.kbd .thumb { background: var(--f-thumb); --edge: var(--e-thumb); }
+.kbd .key.next { background: var(--accent); color: var(--on-accent); border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); }
+.kbd .key.hit { transform: translateY(2px); }
+.kbd .key.held { background: var(--sunk); transform: translateY(2px); }
+.kbd .key.locked { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.kbd .key.locked::before { content: ""; position: absolute; top: 6px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.kbd .key.miss { background: var(--koi); color: var(--bg); border-color: var(--koi); }
+
+/* Results */
+.result {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 32px 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center;
+}
+.result h2 { font: 700 2rem var(--font-display); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+.stars { font-size: 3rem; letter-spacing: 0.15em; }
+.stars .off { filter: grayscale(1); opacity: .25; }
+.figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; max-width: 520px; }
+.figures div { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 8px; }
+.figures b { font: 700 2rem var(--font-display); font-variant-numeric: tabular-nums; color: var(--accent); }
+.figures span { font: 500 0.75rem var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.tricky-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+.tricky-list span { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 2px 12px; font: 1.05rem var(--font-type); }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+/* Settings sheet (looks like Violin Toolkit's): a card over a blurred scrim, Done stays on screen on a phone. */
+.sheet {
+  position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 20px;
+  background: var(--scrim); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  color: var(--fg); overflow-y: auto;
+}
+.sheet-card {
+  width: min(100%, 420px); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .3); outline: none;
+}
+.sheet-card h2 { margin: 0 0 14px; font: 700 24px/1.1 var(--font-display); letter-spacing: -0.02em; }
+.sheet-card h3 { margin: 14px 0 8px; font: 500 12px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+/* Segmented control: one choice of several, the chosen one filled with the accent. */
+.segc { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.segc button { height: 42px; border: 0; background: transparent; color: var(--fg); font: 500 15px var(--font-body); }
+.segc button + button { border-left: 1px solid var(--line); }
+.segc button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); }
+.segc button:focus-visible, .sheet-done:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.ver { margin: 14px 0 0; text-align: center; font: 500 12px var(--font-mono); letter-spacing: 0.04em; color: var(--muted); }
+.sheet-done {
+  position: sticky; bottom: 0; box-shadow: 0 -10px 12px var(--panel);
+  margin-top: 18px; width: 100%; height: 46px; border: 0; border-radius: 12px;
+  background: var(--accent); color: var(--on-accent); font: 700 16px var(--font-body);
+}
+
+/* Smaller screens: shrink the keyboard so it never forces sideways scroll. */
+@media (max-width: 760px) {
+  .kbd { --kh: 38px; gap: 4px; }
+  .kbd .row { gap: 4px; }
+  .kbd .key { width: calc(var(--u) * var(--w, 1) - 4px); font-size: 0.85rem; border-radius: 6px; }
+  .kbd .key.named { font-size: 0.6rem; padding: 0 0 3px 4px; }
+  .line { font-size: 1.7rem; }
+  .line.small { font-size: 1.3rem; }
+  .levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .brand h1 { font-size: 2.1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
