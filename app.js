@@ -9,7 +9,7 @@
   };
   // Timed games: Spelling Bee is a 20-minute session with as many words as Luke can manage.
   // Words come in batches of ROUND.spell, and none repeats within a session.
-  const MINUTES = { spell: 20 };
+  const MINUTES = { spell: 2 }; // test build only (live: 20)
   const PRAISE = ["Lovely!", "Brilliant!", "Smooth!", "Nice and calm.", "Great typing!", "Spot on!"];
 
   // ---------- Saved progress (per browser) ----------
