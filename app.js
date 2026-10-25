@@ -10,6 +10,8 @@
   // Timed games: Spelling Bee is a 20-minute session with as many words as Luke can manage.
   // Words come in batches of ROUND.spell, and none repeats within a session.
   const MINUTES = { spell: 2 }; // test build only (live: 20)
+  // The time bar flashes red for the last 2.5% of a session: 30 s of 20 minutes, 3 s of 2 (the test build).
+  const ENDING = 0.025;
   const PRAISE = ["Lovely!", "Brilliant!", "Smooth!", "Nice and calm.", "Great typing!", "Spot on!"];
 
   // ---------- Saved progress (per browser) ----------
@@ -264,8 +266,13 @@
     const clock = $("#clock");
     clock.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
     clock.classList.toggle("low", secs <= 60);
+    // The bar fills from the left as time passes, and flashes red near the end.
+    const total = MINUTES[game.mode] * 60000;
     const bar = $("#trail .time b");
-    if (bar) bar.style.width = (left / (MINUTES[game.mode] * 60000)) * 100 + "%";
+    if (bar) {
+      bar.style.width = ((total - left) / total) * 100 + "%";
+      bar.classList.toggle("ending", left <= total * ENDING);
+    }
     if (left <= 0 && !$("#play").hidden) finish();
   }
 
