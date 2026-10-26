@@ -308,6 +308,8 @@
       bar.classList.toggle("ending", left <= total * ENDING);
     }
     clock.classList.toggle("grace", !left && !!game.grace);
+    // Paused inside the grace: keep showing the frozen "Finish: n" rather than 0:00.
+    if (game.pausedAt && game.grace) clock.textContent = `Finish: ${Math.ceil((game.endsAt + GRACE - now) / 1000)}`;
     if (left > 0 || game.pausedAt || $("#play").hidden) return;
     // Time is up. A word he has started gets up to GRACE more to finish; one finished in that time is
     // counted, and next() then ends the game. If it isn't finished by then, it isn't counted.
@@ -343,7 +345,7 @@
 
   function loadItem() {
     const it = game.items[game.idx];
-    resumeClock(); // the next word clears a "Leave this round?" that was asked between words
+    resumeClock(); // a safety net: next() no longer loads a word while "Leave this round?" is up
     Object.assign(game, { typed: "", posErr: 0, revealed: false, itemErr: 0, itemStart: null, wait: false, leaving: null });
     $("#msg").className = "msg";
     $("#msg").innerHTML = "";
@@ -513,6 +515,8 @@
 
   function next() {
     if (!game || game.over) return;
+    // "Leave this round?" is up (asked just after a word): the next word waits for his answer.
+    if (game.leaving) { game.nextWaiting = true; return; }
     if (game.endsAt && (game.pausedAt || Date.now()) >= game.endsAt) return finish(); // time is up: no next word
     game.idx++;
     // A timed game never runs out of words: add another batch (if the level has any left).
@@ -636,6 +640,9 @@
       $("#msg").innerHTML = game.leaving.html;
       game.leaving = null;
       resumeClock();
+      // He carried on after a question asked between words: now load the word that was waiting.
+      // The key itself is used up, as the last word is already done.
+      if (game.nextWaiting) { game.nextWaiting = false; e.preventDefault(); return next(); }
       if (e.key === "Enter" && game.wait !== "enter") { e.preventDefault(); return; }
     }
     if (game.wait === "enter") { if (e.key === "Enter") { e.preventDefault(); next(); } return; }
