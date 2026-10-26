@@ -22,7 +22,7 @@
   // this version it becomes the first user (v1 itself is left as it was).
   const KEY = "typingZen.v2-test";
   const OLD_KEY = "typingZen.v1-test";
-  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red" });
+  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "" });
   // Names start with a capital letter. A blank name stays blank: the welcome form asks for one.
   const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : ""; };
   const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -265,6 +265,26 @@
 
   // Speaks each text in turn with a one-second pause between them.
   // Any new call (or leaving the game) stops a sequence that is still playing.
+  // The voice for words and sentences (user's request, 2026-10-27), saved per user as profile.voice:
+  // "" = Automatic, "female" or "male" = the best English voice of that kind, or a voiceURI for an exact
+  // voice. Each device has its own voices, so a choice it can't meet falls back to Automatic: British
+  // English first, then any English voice. Browsers don't say whether a voice is female or male, so it is
+  // guessed from the voice's name (the common Apple, Google and Microsoft voices).
+  const FEMALE = /female|samantha|serena|karen|kate|moira|tessa|fiona|victoria|allison|\bava\b|susan|zira|hazel|libby|sonia|martha|catherine|nicky|veena|stephanie|emma|olivia|natasha|jenny|aria|kathy|vicki|zoe|siobhan|maisie|amy/i;
+  const MALE = /\bmale\b|daniel|arthur|oliver|alex\b|fred\b|\btom\b|aaron|george|ryan|thomas|david|mark\b|james|\blee\b|rishi|guy\b|eric\b|christopher|brian|gordon|ralph|albert|bruce|william|harry|noah|liam|jamie/i;
+  const voiceKind = (v) => (FEMALE.test(v.name) ? "female" : MALE.test(v.name) ? "male" : "");
+  const ACCENTS = { "en-GB": "British", "en-US": "American", "en-AU": "Australian", "en-IE": "Irish", "en-IN": "Indian",
+    "en-ZA": "South African", "en-NZ": "New Zealand", "en-CA": "Canadian", "en-SG": "Singapore" };
+  const englishVoices = () => ("speechSynthesis" in window ? speechSynthesis.getVoices() : [])
+    .filter((v) => /^en([-_]|$)/i.test(v.lang))
+    .sort((a, b) => (b.lang === "en-GB") - (a.lang === "en-GB") || a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+  function pickVoice() {
+    const vs = englishVoices();
+    const want = profile.voice || "";
+    return vs.find((v) => v.voiceURI === want) ||
+      (want === "female" || want === "male" ? vs.find((v) => voiceKind(v) === want) : null) ||
+      vs.find((v) => v.lang === "en-GB") || vs[0] || null;
+  }
   let speechRun = 0;
   let speakTimer = 0; // the short wait before a new item is spoken; cleared by stopSpeech()
   function speak(...texts) {
@@ -274,9 +294,9 @@
     const say = (i) => {
       if (run !== speechRun || i >= texts.length) return;
       const u = new SpeechSynthesisUtterance(texts[i]);
-      const voices = speechSynthesis.getVoices();
-      u.voice = voices.find((v) => v.lang === "en-GB") || voices.find((v) => v.lang.startsWith("en")) || null;
-      u.lang = "en-GB";
+      const voice = pickVoice();
+      if (voice) u.voice = voice;
+      u.lang = voice ? voice.lang : "en-GB";
       u.rate = 0.85;
       u.onend = () => setTimeout(() => say(i + 1), 1000);
       speechSynthesis.speak(u);
@@ -807,6 +827,7 @@
   // year: it sets which three levels are open.
   const sheet = $("#sheet");
   function syncSheet() {
+    fillVoices();
     for (const b of $("#segApp").children) b.setAttribute("aria-checked", String(b.dataset.themeMode === THEME.mode));
     for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
     for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (currentSwitch() || "off")));
@@ -880,6 +901,37 @@
     </svg>`;
   $("#segSound").innerHTML = SWITCH_LOOK.map(([id, name, how, colour, extra]) =>
     `<button type="button" role="radio" aria-checked="false" data-sound="${id}" aria-label="${name}" title="${name}: ${how}">${switchPicture(colour, extra)}</button>`).join("");
+  // Voice: Automatic / Female / Male, then the exact English voices this device has, each labelled with its
+  // accent and kind. Voices can arrive after the page loads (voiceschanged).
+  const SAMPLE = "This is how I will read your words.";
+  function fillVoices() {
+    const vs = englishVoices();
+    const want = profile.voice || "";
+    const exact = vs.some((v) => v.voiceURI === want);
+    // Tick what will actually be used: a kind this device has no voice for shows as Automatic.
+    const kind = (want === "female" || want === "male") && vs.some((v) => voiceKind(v) === want) ? want : "";
+    for (const b of $("#segVoice").children) {
+      b.setAttribute("aria-checked", String(!exact && b.dataset.voice === kind));
+      b.disabled = !!b.dataset.voice && !vs.some((v) => voiceKind(v) === b.dataset.voice); // none of that kind here
+    }
+    $("#voiceSel").innerHTML = `<option value="">Exact voice: none (use the choice above)</option>` + vs.map((v) => {
+      const about = [ACCENTS[v.lang] || v.lang, voiceKind(v)].filter(Boolean).join(", ");
+      return `<option value="${escapeHtml(v.voiceURI)}">${escapeHtml(v.name)} (${escapeHtml(about)})</option>`;
+    }).join("");
+    $("#voiceSel").value = exact ? want : "";
+    $("#voiceRow").hidden = !("speechSynthesis" in window);
+  }
+  if ("speechSynthesis" in window && speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged", fillVoices);
+  $("#segVoice").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b || b.disabled) return;
+    profile.voice = b.dataset.voice;
+    save();
+    fillVoices();
+    speak(SAMPLE);
+  });
+  $("#voiceSel").addEventListener("change", (e) => { profile.voice = e.target.value; save(); fillVoices(); speak(SAMPLE); });
+  $("#voiceTry").addEventListener("click", () => speak(SAMPLE));
   // Key sound: choosing one plays a sample of it.
   $("#segSound").addEventListener("click", (e) => {
     const b = e.target.closest("button");

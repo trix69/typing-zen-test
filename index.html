@@ -36,7 +36,7 @@
   window.THEME.apply();
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=4737d32a07">
+<link rel="stylesheet" href="style.css?v=4237e1ea79">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -193,23 +193,37 @@
 <!-- SETTINGS -->
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
   <div class="sheet-card" id="sheetCard" tabindex="-1">
+    <div class="sheet-body">
     <h2 id="sheetTitle">Settings</h2>
     <h3 id="lblYear">Your year</h3>
     <div class="choices" role="radiogroup" aria-labelledby="lblYear" id="segYear"></div>
     <h3 id="lblSound">Key sound</h3>
     <div class="choices sounds" role="radiogroup" aria-labelledby="lblSound" id="segSound"></div>
+    <div id="voiceRow">
+      <h3 id="lblVoice">Voice for words and sentences</h3>
+      <div class="segc" role="radiogroup" aria-labelledby="lblVoice" id="segVoice">
+        <button type="button" role="radio" aria-checked="false" data-voice="">Automatic</button>
+        <button type="button" role="radio" aria-checked="false" data-voice="female">Female</button>
+        <button type="button" role="radio" aria-checked="false" data-voice="male">Male</button>
+      </div>
+      <div class="voice-row">
+        <select id="voiceSel" aria-labelledby="lblVoice"></select>
+        <button type="button" class="ghost small" id="voiceTry">Try</button>
+      </div>
+    </div>
     <h3 id="lblApp">Appearance</h3>
     <div class="segc" role="radiogroup" aria-labelledby="lblApp" id="segApp">
       <button type="button" role="radio" aria-checked="false" data-theme-mode="light">Light</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="dark">Dark</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="auto">Automatic</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="4737d32a07">1.02-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="4237e1ea79">1.02-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=4737d32a07"></script>
-<script src="data.js?v=4737d32a07"></script>
-<script src="app.js?v=4737d32a07"></script>
+<script src="words.js?v=4237e1ea79"></script>
+<script src="data.js?v=4237e1ea79"></script>
+<script src="app.js?v=4237e1ea79"></script>
 </body>
 </html>

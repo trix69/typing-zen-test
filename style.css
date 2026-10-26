@@ -181,6 +181,15 @@ kbd {
 .switch .sw-lines { fill: none; stroke: #2f6bd8; stroke-width: 2.5; stroke-linecap: round; }
 .switch .sw-off { stroke: var(--bad); stroke-width: 3.5; stroke-linecap: round; }
 .choices.sounds button[aria-checked="true"] .sw-top { fill: color-mix(in srgb, var(--on-accent) 30%, var(--accent)); stroke: var(--on-accent); }
+/* Voice picker: a select and a Try button. */
+.voice-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.segc button:disabled { color: var(--muted); opacity: .5; cursor: not-allowed; }
+.voice-row select {
+  flex: 1; min-width: 0; width: 100%; text-overflow: ellipsis; height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg); color: var(--fg); font: 500 15px var(--font-body);
+}
+.voice-row select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.voice-row button { height: 42px; }
 /* Tighter headings on very narrow phones, so the version line isn't hidden under the sticky Done (Hermes R14.1). */
 @media (max-width: 360px) {
   .sheet-card h3 { margin: 10px 0 6px; }
@@ -377,14 +386,19 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 /* Settings sheet (looks like Violin Toolkit's): a card over a blurred scrim, Done stays on screen on a phone. */
 .sheet {
   position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 20px;
+  grid-template-columns: minmax(0, 1fr); /* a long voice name can't make the card wider than the screen */
   background: var(--scrim); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
   color: var(--fg); overflow-y: auto;
 }
+/* The settings scroll inside .sheet-body when the screen is short, and Done sits below them, so it can never
+   cover a setting (Hermes R14.1; it used to be sticky over the bottom of the list). */
 .sheet-card {
-  width: min(100%, 420px); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow-y: auto;
+  width: min(100%, 420px); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px);
+  display: flex; flex-direction: column;
   background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 20px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, .3); outline: none;
 }
+.sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: -4px; padding: 4px; } /* room for focus rings */
 .sheet-card h2 { margin: 0 0 14px; font: 700 24px/1.1 var(--font-display); letter-spacing: -0.02em; }
 .sheet-card h3 { margin: 14px 0 8px; font: 500 12px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 /* Segmented control: one choice of several, the chosen one filled with the accent. */
@@ -401,8 +415,8 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .ver:hover { color: var(--fg); }
 .ver:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .sheet-done {
-  position: sticky; bottom: 0; box-shadow: 0 -10px 12px var(--panel);
-  margin-top: 18px; width: 100%; height: 46px; border: 0; border-radius: 12px;
+  flex: none;
+  margin-top: 14px; width: 100%; height: 46px; border: 0; border-radius: 12px;
   background: var(--accent); color: var(--on-accent); font: 700 16px var(--font-body);
 }
 
