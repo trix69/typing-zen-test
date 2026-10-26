@@ -36,7 +36,7 @@
   window.THEME.apply();
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=3c7b8616b1">
+<link rel="stylesheet" href="style.css?v=0db5987063">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -111,7 +111,10 @@
     <div class="hello">
       <p class="hello-name">Hi, <b id="userName"></b></p>
       <button type="button" class="ghost small" id="switchUserBtn">Switch user</button>
-      <p class="today" id="todayStats"></p>
+      <div class="today-row">
+        <p class="today" id="todayStats"></p>
+        <button type="button" class="ghost small" id="statsBtn">View stats</button>
+      </div>
       <div class="history">
         <p class="stats" id="homeStats"></p>
         <button class="ghost small" id="clearBtn" hidden>Clear history</button>
@@ -193,18 +196,27 @@
     <h2 id="sheetTitle">Settings</h2>
     <h3 id="lblYear">Your year</h3>
     <div class="choices" role="radiogroup" aria-labelledby="lblYear" id="segYear"></div>
+    <h3 id="lblSound">Key sound</h3>
+    <div class="choices" role="radiogroup" aria-labelledby="lblSound" id="segSound">
+      <button type="button" role="radio" aria-checked="false" data-sound="soft" title="A gentle tap">Soft</button>
+      <button type="button" role="radio" aria-checked="false" data-sound="clicky" title="A sharp click, like a Cherry MX Blue switch">Clicky</button>
+      <button type="button" role="radio" aria-checked="false" data-sound="tactile" title="A soft thud, like a Cherry MX Brown switch">Tactile</button>
+      <button type="button" role="radio" aria-checked="false" data-sound="thock" title="A deep, low press, like a Cherry MX Black or Gateron Ink switch">Thock</button>
+      <button type="button" role="radio" aria-checked="false" data-sound="cushioned" title="A round, cushioned press, like a Topre keyboard">Cushioned</button>
+      <button type="button" role="radio" aria-checked="false" data-sound="off" title="No sound for keys (speech still plays)">Off</button>
+    </div>
     <h3 id="lblApp">Appearance</h3>
     <div class="segc" role="radiogroup" aria-labelledby="lblApp" id="segApp">
       <button type="button" role="radio" aria-checked="false" data-theme-mode="light">Light</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="dark">Dark</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="auto">Automatic</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="3c7b8616b1">1.02-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="0db5987063">1.02-test</span></span> · <span id="verMsg">Check for updates</span></button>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=3c7b8616b1"></script>
-<script src="data.js?v=3c7b8616b1"></script>
-<script src="app.js?v=3c7b8616b1"></script>
+<script src="words.js?v=0db5987063"></script>
+<script src="data.js?v=0db5987063"></script>
+<script src="app.js?v=0db5987063"></script>
 </body>
 </html>

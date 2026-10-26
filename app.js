@@ -22,7 +22,7 @@
   // this version it becomes the first user (v1 itself is left as it was).
   const KEY = "typingZen.v2-test";
   const OLD_KEY = "typingZen.v1-test";
-  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false });
+  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "soft" });
   // Names start with a capital letter. A blank name stays blank: the welcome form asks for one.
   const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : ""; };
   const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -181,8 +181,60 @@
       o.start(); o.stop(audio.currentTime + dur);
     } catch { /* no audio */ }
   }
+  // Key sounds, chosen in Settings (user's request, 2026-10-27; families from typersguild.com's switch
+  // tester). They are made here from short noise bursts and low tones, not recordings: each part is
+  // [delay s, band-pass Hz, Q, length s, volume] for noise, or ["thump", delay, Hz, length, volume] for a tone.
+  const KEY_SOUNDS = {
+    soft: null, // the original gentle tap
+    clicky: [[0, 4200, 3, 0.012, 0.32], [0.016, 2800, 2, 0.02, 0.22], ["thump", 0.016, 190, 0.03, 0.12]], // like Cherry MX Blue
+    tactile: [[0, 1700, 1.4, 0.03, 0.28], ["thump", 0, 150, 0.05, 0.2]], // like Cherry MX Brown
+    thock: [[0, 650, 1, 0.05, 0.32], ["thump", 0, 95, 0.07, 0.36]], // like Cherry MX Black / Gateron Ink
+    cushioned: [[0.004, 900, 0.8, 0.06, 0.22], ["thump", 0.004, 115, 0.08, 0.28]], // like Topre
+    off: [],
+  };
+  let noise;
+  function keySound(kind) {
+    const parts = KEY_SOUNDS[kind];
+    if (parts === null || parts === undefined) return tone(660 + Math.random() * 60, 0.05, "sine", 0.03);
+    if (profile.mute || !parts.length) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (!noise) {
+        noise = audio.createBuffer(1, audio.sampleRate * 0.2, audio.sampleRate);
+        const d = noise.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      const now = audio.currentTime + 0.005;
+      const pitch = 0.94 + Math.random() * 0.12; // no two presses quite the same
+      for (const p of parts) {
+        const g = audio.createGain();
+        let src;
+        if (p[0] === "thump") {
+          const [, at, hz, len, vol] = p;
+          src = audio.createOscillator();
+          src.type = "sine";
+          src.frequency.setValueAtTime(hz * pitch, now + at);
+          src.frequency.exponentialRampToValueAtTime(hz * 0.6, now + at + len);
+          g.gain.setValueAtTime(vol, now + at);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + at + len);
+          src.connect(g).connect(audio.destination);
+          src.start(now + at); src.stop(now + at + len);
+        } else {
+          const [at, hz, q, len, vol] = p;
+          src = audio.createBufferSource();
+          src.buffer = noise;
+          const f = audio.createBiquadFilter();
+          f.type = "bandpass"; f.frequency.value = hz * pitch; f.Q.value = q;
+          g.gain.setValueAtTime(vol, now + at);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + at + len);
+          src.connect(f).connect(g).connect(audio.destination);
+          src.start(now + at); src.stop(now + at + len);
+        }
+      }
+    } catch { /* no audio */ }
+  }
   const sfx = {
-    tap: () => tone(660 + Math.random() * 60, 0.05, "sine", 0.03),
+    tap: () => keySound(profile.keySound),
     miss: () => tone(150, 0.15, "triangle", 0.06),
     chime: () => { tone(784, 0.25); setTimeout(() => tone(1047, 0.35), 110); },
   };
@@ -732,6 +784,7 @@
   function syncSheet() {
     for (const b of $("#segApp").children) b.setAttribute("aria-checked", String(b.dataset.themeMode === THEME.mode));
     for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
+    for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (profile.keySound || "soft")));
   }
   function openSheet() {
     syncSheet();
@@ -780,6 +833,16 @@
     const b = e.target.closest("button");
     if (b) { THEME.set(b.dataset.themeMode); syncSheet(); }
   });
+  // Key sound: choosing one plays a sample of it.
+  $("#segSound").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    profile.keySound = b.dataset.sound;
+    save();
+    syncSheet();
+    keySound(profile.keySound);
+  });
+  $("#statsBtn").addEventListener("click", showWelcome); // View stats: back to the welcome screen's 7 days
   $("#segYear").innerHTML = BUCKETS.map((b) => `<button type="button" role="radio" aria-checked="false" data-year="${b.name}">${b.label}</button>`).join("");
   $("#segYear").addEventListener("click", (e) => {
     const b = e.target.closest("button");
