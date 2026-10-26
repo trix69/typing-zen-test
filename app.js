@@ -594,6 +594,15 @@
     game = null;
     stopSpeech();
     $("#userName").textContent = profile.name;
+    // Today, from midnight local time: words finished in this user's Spelling Bee sessions, and how many of
+    // them were right first try (user's request, 2026-10-26).
+    const today = new Date().toDateString();
+    const todays = profile.sessions.filter((s) => new Date(s.date).toDateString() === today);
+    const first = todays.reduce((n, s) => n + (s.firstTry || 0), 0);
+    const words = first + todays.reduce((n, s) => n + (s.struggled || 0), 0);
+    $("#todayStats").innerHTML = words
+      ? `Today: <b>${words}</b> word${words === 1 ? "" : "s"} practised · <b>${Math.round((first / words) * 100)}%</b> right first try`
+      : "Today: no words yet.";
     const open = unlocked(profile.year);
     for (const b of document.querySelectorAll(".level")) {
       b.disabled = !open.includes(b.dataset.bucket);
