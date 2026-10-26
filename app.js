@@ -22,7 +22,7 @@
   // this version it becomes the first user (v1 itself is left as it was).
   const KEY = "typingZen.v2-test";
   const OLD_KEY = "typingZen.v1-test";
-  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "soft" });
+  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red" });
   // Names start with a capital letter. A blank name stays blank: the welcome form asks for one.
   const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : ""; };
   const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -43,6 +43,8 @@
     for (const [k, v] of Object.entries(DEFAULTS())) if (!(k in u)) u[k] = v;
     // A 1.0 profile has no school year: take its level as the year (it can be changed in Settings).
     if (!/^Y[1-6]$/.test(u.year)) u.year = /^Y[1-6]$/.test(u.bucket) ? u.bucket : "Y1";
+    // The first key sounds were replaced by five switches (2026-10-27): keep each user's nearest one.
+    u.keySound = { soft: "red", cushioned: "red", thock: "black", tactile: "brown", clicky: "blue" }[u.keySound] || u.keySound;
   }
   let profile = store.users[store.current] || DEFAULTS(); // replaced by useProfile() once someone is chosen
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* storage unavailable */ } };
@@ -181,21 +183,20 @@
       o.start(); o.stop(audio.currentTime + dur);
     } catch { /* no audio */ }
   }
-  // Key sounds, chosen in Settings (user's request, 2026-10-27; families from typersguild.com's switch
-  // tester). They are made here from short noise bursts and low tones, not recordings: each part is
+  // Key sounds, chosen in Settings: five mechanical keyboard switches (user's choice, 2026-10-27).
+  // They are made here from short noise bursts and low tones, not recordings: each part is
   // [delay s, band-pass Hz, Q, length s, volume] for noise, or ["thump", delay, Hz, length, volume] for a tone.
   const KEY_SOUNDS = {
-    soft: null, // the original gentle tap
-    clicky: [[0, 4200, 3, 0.012, 0.32], [0.016, 2800, 2, 0.02, 0.22], ["thump", 0.016, 190, 0.03, 0.12]], // like Cherry MX Blue
-    tactile: [[0, 1700, 1.4, 0.03, 0.28], ["thump", 0, 150, 0.05, 0.2]], // like Cherry MX Brown
-    thock: [[0, 650, 1, 0.05, 0.32], ["thump", 0, 95, 0.07, 0.36]], // like Cherry MX Black / Gateron Ink
-    cushioned: [[0.004, 900, 0.8, 0.06, 0.22], ["thump", 0.004, 115, 0.08, 0.28]], // like Topre
+    red: [[0, 1300, 1.1, 0.025, 0.2], ["thump", 0, 160, 0.04, 0.14]], // linear, light: smooth, soft bottom-out
+    black: [[0, 700, 1, 0.045, 0.3], ["thump", 0, 100, 0.065, 0.32]], // linear, heavy: deeper, fuller bottom-out
+    yellow: [[0, 1700, 1.2, 0.03, 0.24], ["thump", 0, 130, 0.05, 0.22]], // linear, medium: smooth, a little brighter
+    brown: [[0, 2600, 2, 0.007, 0.12], [0.012, 1600, 1.3, 0.03, 0.26], ["thump", 0.012, 145, 0.05, 0.2]], // tactile: a small bump, then a soft thud
+    blue: [[0, 4200, 3, 0.012, 0.32], [0.016, 2800, 2, 0.02, 0.22], ["thump", 0.016, 190, 0.03, 0.12]], // clicky: a sharp click, then the bottom-out
     off: [],
   };
   let noise;
   function keySound(kind) {
-    const parts = KEY_SOUNDS[kind];
-    if (parts === null || parts === undefined) return tone(660 + Math.random() * 60, 0.05, "sine", 0.03);
+    const parts = KEY_SOUNDS[kind] || KEY_SOUNDS.red;
     if (profile.mute || !parts.length) return;
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
@@ -784,7 +785,7 @@
   function syncSheet() {
     for (const b of $("#segApp").children) b.setAttribute("aria-checked", String(b.dataset.themeMode === THEME.mode));
     for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
-    for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (profile.keySound || "soft")));
+    for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (KEY_SOUNDS[profile.keySound] ? profile.keySound : "red")));
   }
   function openSheet() {
     syncSheet();

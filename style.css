@@ -171,6 +171,8 @@ kbd {
   border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg); font: 600 1rem var(--font-body);
 }
 .choices button { height: 44px; }
+.choices.sounds button { height: auto; min-height: 44px; padding: 6px 8px; line-height: 1.2; }
+@media (max-width: 480px) { .choices.sounds { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .choices button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .choices button:hover, .user-list .user:hover { border-color: var(--accent); }
 .intro-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
