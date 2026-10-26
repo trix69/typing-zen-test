@@ -219,6 +219,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .topbar .clock { font: 500 1.15rem var(--font-mono); font-variant-numeric: tabular-nums; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px 10px; }
 .topbar .clock.low { color: var(--koi); border-color: var(--koi); }
 .topbar .clock.paused { color: var(--muted); border-style: dashed; }
+.topbar .clock.grace { color: var(--bad); border-color: var(--bad); }
 /* In a timed game the trail is one bar that fills from the left as time passes, and flashes red near the end
    (with reduced motion it is steady red). */
 .trail i.time { background: var(--sunk); position: relative; overflow: hidden; }

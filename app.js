@@ -12,6 +12,8 @@
   const MINUTES = { spell: 2 }; // test build only (live: 20)
   // The time bar flashes red for the last 2.5% of a session: 30 s of 20 minutes, 3 s of 2 (the test build).
   const ENDING = 0.025;
+  // When time runs out mid-word, Luke gets up to 10 s more to finish that word (user's request, 2026-10-26).
+  const GRACE = 10000;
   const PRAISE = ["Lovely!", "Brilliant!", "Smooth!", "Nice and calm.", "Great typing!", "Spot on!"];
 
   // ---------- Saved progress (per browser) ----------
@@ -288,10 +290,11 @@
     loadItem();
   }
 
-  // Shows the time left, and ends a timed game at 0:00. A word that is half typed then isn't counted.
+  // Shows the time left, and ends a timed game at 0:00, or up to GRACE later if a word is being typed.
   function tickClock() {
     if (!game || !game.endsAt || game.over) return;
-    const left = Math.max(0, game.endsAt - (game.pausedAt || Date.now())); // frozen while paused
+    const now = game.pausedAt || Date.now(); // frozen while paused
+    const left = Math.max(0, game.endsAt - now);
     const secs = Math.ceil(left / 1000);
     const clock = $("#clock");
     clock.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
@@ -304,7 +307,24 @@
       bar.style.width = ((total - left) / total) * 100 + "%";
       bar.classList.toggle("ending", left <= total * ENDING);
     }
-    if (left <= 0 && !game.pausedAt && !$("#play").hidden) finish();
+    clock.classList.toggle("grace", !left && !!game.grace);
+    if (left > 0 || game.pausedAt || $("#play").hidden) return;
+    // Time is up. A word he has started gets up to GRACE more to finish; one finished in that time is
+    // counted, and next() then ends the game. If it isn't finished by then, it isn't counted.
+    const inWord = game.itemStart !== null && !game.wait;
+    const graceLeft = game.endsAt + GRACE - now;
+    if (inWord && graceLeft > 0) {
+      if (!game.grace) {
+        game.grace = true;
+        $("#msg").className = "msg";
+        $("#msg").textContent = "Time's up! Finish this word.";
+      }
+      clock.textContent = `Finish: ${Math.ceil(graceLeft / 1000)}`;
+      clock.classList.add("grace");
+      return;
+    }
+    if (game.wait && game.grace) return; // the grace word was just finished: next() ends it after the praise
+    finish();
   }
 
   // The clock pauses while "Leave this round?" is on screen (user's request, 2026-10-26). Resuming moves
@@ -492,6 +512,7 @@
 
   function next() {
     if (!game || game.over) return;
+    if (game.endsAt && (game.pausedAt || Date.now()) >= game.endsAt) return finish(); // time is up: no next word
     game.idx++;
     // A timed game never runs out of words: add another batch (if the level has any left).
     if (game.endsAt && game.idx >= game.items.length) game.items.push(...buildItems(game.mode));
