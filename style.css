@@ -171,8 +171,22 @@ kbd {
   border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg); font: 600 1rem var(--font-body);
 }
 .choices button { height: 44px; }
-.choices.sounds button { height: auto; min-height: 44px; padding: 6px 8px; line-height: 1.2; }
-@media (max-width: 480px) { .choices.sounds { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Key sound choices are pictures of switches (drawn in app.js), three to a row. */
+.choices.sounds button { height: 56px; padding: 4px; display: grid; place-items: center; }
+.choices.sounds .switch { width: 56px; height: 42px; display: block; }
+.switch .sw-top { fill: color-mix(in srgb, var(--muted) 35%, var(--bg)); stroke: var(--muted); stroke-width: 1.5; }
+.switch .sw-base { fill: color-mix(in srgb, var(--fg) 70%, var(--bg)); }
+.switch .sw-stem { stroke: var(--fg); stroke-width: 1.2; stroke-opacity: .6; }
+.switch .sw-pin { stroke: var(--muted); stroke-width: 2.5; stroke-linecap: round; }
+.switch .sw-lines { fill: none; stroke: #2f6bd8; stroke-width: 2.5; stroke-linecap: round; }
+.switch .sw-off { stroke: var(--bad); stroke-width: 3.5; stroke-linecap: round; }
+.choices.sounds button[aria-checked="true"] .sw-top { fill: color-mix(in srgb, var(--on-accent) 30%, var(--accent)); stroke: var(--on-accent); }
+/* Tighter headings on very narrow phones, so the version line isn't hidden under the sticky Done (Hermes R14.1). */
+@media (max-width: 360px) {
+  .sheet-card h3 { margin: 10px 0 6px; }
+  .choices.sounds button { height: 48px; }
+  .choices.sounds .switch { width: 48px; height: 36px; }
+}
 .choices button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .choices button:hover, .user-list .user:hover { border-color: var(--accent); }
 .intro-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }

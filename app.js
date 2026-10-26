@@ -136,6 +136,7 @@
   // and Caps Lock toggles. Tab, backspace, ctrl and alt type nothing, as on the real keyboard in the games.
   let screenShift = false;
   function tapKey(id) {
+    if (id === "shift-l" || id === "shift-r" || id === "caps") pressSound(id);
     if (id === "shift-l" || id === "shift-r") {
       screenShift = shiftHeld = !screenShift;
       return refreshKeyboard();
@@ -168,6 +169,10 @@
     e.preventDefault(); // no text selection, no focus change, no double-tap zoom
     tapKey(k.dataset.key);
   });
+  // Lifting the finger (or the mouse button) plays the release sound.
+  for (const ev of ["pointerup", "pointercancel", "pointerleave"]) {
+    $("#kbd").addEventListener(ev, (e) => { const k = e.target.closest(".key"); if (k) releaseSound(k.dataset.key); });
+  }
 
   // ---------- Sound ----------
   let audio;
@@ -184,58 +189,76 @@
     } catch { /* no audio */ }
   }
   // Key sounds, chosen in Settings: five mechanical keyboard switches (user's choice, 2026-10-27).
-  // They are made here from short noise bursts and low tones, not recordings: each part is
-  // [delay s, band-pass Hz, Q, length s, volume] for noise, or ["thump", delay, Hz, length, volume] for a tone.
-  const KEY_SOUNDS = {
-    red: [[0, 1300, 1.1, 0.025, 0.2], ["thump", 0, 160, 0.04, 0.14]], // linear, light: smooth, soft bottom-out
-    black: [[0, 700, 1, 0.045, 0.3], ["thump", 0, 100, 0.065, 0.32]], // linear, heavy: deeper, fuller bottom-out
-    yellow: [[0, 1700, 1.2, 0.03, 0.24], ["thump", 0, 130, 0.05, 0.22]], // linear, medium: smooth, a little brighter
-    brown: [[0, 2600, 2, 0.007, 0.12], [0.012, 1600, 1.3, 0.03, 0.26], ["thump", 0.012, 145, 0.05, 0.2]], // tactile: a small bump, then a soft thud
-    blue: [[0, 4200, 3, 0.012, 0.32], [0.016, 2800, 2, 0.02, 0.22], ["thump", 0.016, 190, 0.03, 0.12]], // clicky: a sharp click, then the bottom-out
-    off: [],
-  };
-  let noise;
-  function keySound(kind) {
-    const parts = KEY_SOUNDS[kind] || KEY_SOUNDS.red;
-    if (profile.mute || !parts.length) return;
+  // Recordings from kbsim by Thomas Lai (MIT licence, see sounds/SOURCE.md): one press sound per keyboard
+  // row (GENERIC_R0..R4, so Esc, Tab, Caps Lock and Shift sound like their rows), Space, Enter and Backspace's
+  // own press and release where the switch has them, and a release sound when the key comes up. A switch's
+  // files are fetched and decoded the first time it is used; the artifact copy carries them in
+  // window.TZ_SOUNDS (tools/bundle.py).
+  const SWITCHES = { red: true, black: true, yellow: true, brown: true, blue: false }; // true: has Space/Enter/Backspace files
+  const SPECIAL = { " ": "SPACE", enter: "ENTER", backspace: "BACKSPACE" };
+  const rowOf = { escape: 0 };
+  ROWS.forEach((row, r) => row.forEach((spec) => { rowOf[Array.isArray(spec) ? spec[1] : spec] = r; }));
+  const loaded = {}; // switch -> Promise, with .bufs { "press/GENERIC_R1": AudioBuffer, ... }
+  const sounding = new Set(); // keys whose press played, so their release plays when they come up
+  const currentSwitch = () => (profile.keySound === "off" ? null : SWITCHES[profile.keySound] !== undefined ? profile.keySound : "red");
+  function loadSwitch(sw) {
+    if (!sw) return Promise.resolve();
+    if (loaded[sw]) return loaded[sw];
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); } catch { return Promise.resolve(); }
+    const names = ["release/GENERIC"];
+    for (let r = 0; r < 5; r++) names.push(`press/GENERIC_R${r}`);
+    if (SWITCHES[sw]) for (const n of Object.values(SPECIAL)) names.push(`press/${n}`, `release/${n}`);
+    const bufs = {};
+    loaded[sw] = Promise.all(names.map((n) => {
+      const path = `sounds/${sw}/${n}.mp3`;
+      return fetch((window.TZ_SOUNDS && window.TZ_SOUNDS[path]) || path)
+        .then((r) => r.arrayBuffer())
+        .then((a) => new Promise((ok, no) => audio.decodeAudioData(a, ok, no)))
+        .then((b) => { bufs[n] = b; })
+        .catch(() => { /* a missing file stays silent */ });
+    }));
+    loaded[sw].bufs = bufs;
+    return loaded[sw];
+  }
+  // Plays the press (or release) recording for an on-screen key id ("a", " ", "shift-l", "escape"…).
+  function keySound(id, phase = "press") {
+    const sw = currentSwitch();
+    if (profile.mute || !sw) return;
+    loadSwitch(sw);
+    const bufs = loaded[sw] && loaded[sw].bufs;
+    const name = SPECIAL[id] && SWITCHES[sw] ? `${phase}/${SPECIAL[id]}`
+      : phase === "press" ? `press/GENERIC_R${rowOf[id] ?? 1}` : "release/GENERIC";
+    const buf = bufs && bufs[name];
+    if (!buf) return; // still loading
     try {
-      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      if (!noise) {
-        noise = audio.createBuffer(1, audio.sampleRate * 0.2, audio.sampleRate);
-        const d = noise.getChannelData(0);
-        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      }
-      const now = audio.currentTime + 0.005;
-      const pitch = 0.94 + Math.random() * 0.12; // no two presses quite the same
-      for (const p of parts) {
-        const g = audio.createGain();
-        let src;
-        if (p[0] === "thump") {
-          const [, at, hz, len, vol] = p;
-          src = audio.createOscillator();
-          src.type = "sine";
-          src.frequency.setValueAtTime(hz * pitch, now + at);
-          src.frequency.exponentialRampToValueAtTime(hz * 0.6, now + at + len);
-          g.gain.setValueAtTime(vol, now + at);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + at + len);
-          src.connect(g).connect(audio.destination);
-          src.start(now + at); src.stop(now + at + len);
-        } else {
-          const [at, hz, q, len, vol] = p;
-          src = audio.createBufferSource();
-          src.buffer = noise;
-          const f = audio.createBiquadFilter();
-          f.type = "bandpass"; f.frequency.value = hz * pitch; f.Q.value = q;
-          g.gain.setValueAtTime(vol, now + at);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + at + len);
-          src.connect(f).connect(g).connect(audio.destination);
-          src.start(now + at); src.stop(now + at + len);
-        }
-      }
+      if (audio.state === "suspended") audio.resume();
+      const src = audio.createBufferSource(), g = audio.createGain();
+      src.buffer = buf;
+      g.gain.value = 0.8;
+      src.connect(g).connect(audio.destination);
+      src.start();
     } catch { /* no audio */ }
   }
+  const pressSound = (id) => { keySound(id); sounding.add(id); };
+  const releaseSound = (id) => { if (sounding.delete(id)) keySound(id, "release"); };
+  // Keys that type nothing still make their sound during a game, like a real keyboard.
+  const SOUND_ID = { CapsLock: "caps", Escape: "escape", Backspace: "backspace", Tab: "tab", Enter: "enter" };
+  function soundId(e) {
+    if (e.key === "Shift") return e.code === "ShiftRight" ? "shift-r" : "shift-l";
+    if (e.key === "Control") return e.code === "ControlRight" ? "ctrl-r" : "ctrl-l";
+    if (e.key === "Alt") return e.code === "AltRight" ? "alt-r" : "alt-l";
+    return SOUND_ID[e.key];
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.repeat || !game || $("#play").hidden) return;
+    const id = soundId(e);
+    if (id) pressSound(id);
+  });
+  document.addEventListener("keyup", (e) => {
+    const id = soundId(e) || (e.key && e.key.length === 1 ? baseKey(e.key).key : null);
+    if (id) releaseSound(id);
+  });
   const sfx = {
-    tap: () => keySound(profile.keySound),
     miss: () => tone(150, 0.15, "triangle", 0.06),
     chime: () => { tone(784, 0.25); setTimeout(() => tone(1047, 0.35), 110); },
   };
@@ -371,6 +394,7 @@
 
   function start(mode) {
     game = null; // a new session must not see the last one's words as used
+    loadSwitch(currentSwitch()); // fetch the key sounds now (a click), so the first key isn't silent
     const items = buildItems(mode);
     if (!items.length) return;
     game = { mode, items, idx: 0, correct: 0, errors: 0, ms: 0, missed: new Set(), firstTry: [], struggled: [], over: false };
@@ -553,7 +577,7 @@
       game.correct++;
       game.posErr = 0;
       game.revealed = false;
-      sfx.tap();
+      pressSound(key);
       if (k) { k.classList.add("hit"); setTimeout(() => k.classList.remove("hit"), 90); }
       if (game.typed === it.target) return complete(it);
     } else {
@@ -785,7 +809,7 @@
   function syncSheet() {
     for (const b of $("#segApp").children) b.setAttribute("aria-checked", String(b.dataset.themeMode === THEME.mode));
     for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
-    for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (KEY_SOUNDS[profile.keySound] ? profile.keySound : "red")));
+    for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (currentSwitch() || "off")));
   }
   function openSheet() {
     syncSheet();
@@ -834,6 +858,28 @@
     const b = e.target.closest("button");
     if (b) { THEME.set(b.dataset.themeMode); syncSheet(); }
   });
+  // Key sound choices are drawn as switches (user's request, 2026-10-27): a side view of the housing with the
+  // stem in the switch's colour; a bump for tactile, sound lines for clicky, a line through for Off. The name
+  // is the button's label for screen readers and its tooltip.
+  const SWITCH_LOOK = [
+    ["red", "Linear Red", "Light and smooth, with a soft bottom-out", "#d43a2f", ""],
+    ["black", "Linear Black", "Heavier, with a deeper, fuller bottom-out", "#202326", ""],
+    ["yellow", "Linear Yellow", "Medium weight and smooth, a little brighter", "#e6b929", ""],
+    ["brown", "Tactile Brown", "A small bump, then a soft thud", "#7b4b2a", "bump"],
+    ["blue", "Clicky Blue", "A sharp click, then the bottom-out", "#2f6bd8", "click"],
+    ["off", "Off", "No sound for keys (speech still plays)", "#9aa1a8", "off"],
+  ];
+  const switchPicture = (colour, extra) => `<svg class="switch" viewBox="0 0 64 48" aria-hidden="true">
+      <rect class="sw-stem" x="25" y="3" width="14" height="14" rx="2" fill="${colour}"/>
+      ${extra === "bump" ? `<path class="sw-stem" d="M39 7 l4 3 l-4 3 z" fill="${colour}"/>` : ""}
+      <path class="sw-top" d="M14 30 L18 15 H46 L50 30 Z"/>
+      <rect class="sw-base" x="12" y="29" width="40" height="11" rx="2.5"/>
+      <path class="sw-pin" d="M24 40 v5 M40 40 v5"/>
+      ${extra === "click" ? `<path class="sw-lines" d="M50 6 q5 5 0 10 M55 3 q8 8 0 16"/>` : ""}
+      ${extra === "off" ? `<path class="sw-off" d="M10 44 L54 4"/>` : ""}
+    </svg>`;
+  $("#segSound").innerHTML = SWITCH_LOOK.map(([id, name, how, colour, extra]) =>
+    `<button type="button" role="radio" aria-checked="false" data-sound="${id}" aria-label="${name}" title="${name}: ${how}">${switchPicture(colour, extra)}</button>`).join("");
   // Key sound: choosing one plays a sample of it.
   $("#segSound").addEventListener("click", (e) => {
     const b = e.target.closest("button");
@@ -841,7 +887,8 @@
     profile.keySound = b.dataset.sound;
     save();
     syncSheet();
-    keySound(profile.keySound);
+    // A sample: a letter's press, then its release.
+    loadSwitch(currentSwitch()).then(() => { keySound("j"); setTimeout(() => keySound("j", "release"), 110); });
   });
   $("#statsBtn").addEventListener("click", showWelcome); // View stats: back to the welcome screen's 7 days
   $("#segYear").innerHTML = BUCKETS.map((b) => `<button type="button" role="radio" aria-checked="false" data-year="${b.name}">${b.label}</button>`).join("");
