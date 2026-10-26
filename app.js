@@ -275,13 +275,31 @@
   const voiceKind = (v) => (FEMALE.test(v.name) ? "female" : MALE.test(v.name) ? "male" : "");
   const ACCENTS = { "en-GB": "British", "en-US": "American", "en-AU": "Australian", "en-IE": "Irish", "en-IN": "Indian",
     "en-ZA": "South African", "en-NZ": "New Zealand", "en-CA": "Canadian", "en-SG": "Singapore" };
-  const englishVoices = () => ("speechSynthesis" in window ? speechSynthesis.getVoices() : [])
-    .filter((v) => /^en([-_]|$)/i.test(v.lang))
-    .sort((a, b) => (b.lang === "en-GB") - (a.lang === "en-GB") || a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+  // Devices list many voices, some joke voices and some the same voice once per accent. So: leave out the
+  // novelty voices, keep one of each name (British first), and rank the well-known natural voices first
+  // (user's request, 2026-10-27: "limit to top 5 popular ones").
+  const NOVELTY = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|junior|ralph|kathy|fred)\b/i;
+  const POPULAR = ["google uk english female", "google uk english male", "daniel", "serena", "kate", "oliver", "arthur",
+    "martha", "microsoft sonia", "microsoft libby", "microsoft ryan", "microsoft hazel", "microsoft george", "samantha",
+    "google us english", "ava", "allison", "alex", "tom", "microsoft aria", "microsoft jenny", "microsoft guy", "karen", "moira", "rishi"];
+  const voiceRank = (v) => {
+    const n = v.name.toLowerCase(), i = POPULAR.findIndex((p) => n.startsWith(p));
+    return (i < 0 ? 1000 : i * 10) + (v.lang === "en-GB" ? 0 : 1);
+  };
+  const baseName = (v) => v.name.replace(/\s*\(.*\)\s*$/, "").trim().toLowerCase();
+  const englishVoices = () => {
+    const all = ("speechSynthesis" in window ? speechSynthesis.getVoices() : [])
+      .filter((v) => /^en([-_]|$)/i.test(v.lang) && !NOVELTY.test(v.name))
+      .sort((a, b) => voiceRank(a) - voiceRank(b) || a.name.localeCompare(b.name));
+    const seen = new Set();
+    return all.filter((v) => !seen.has(baseName(v)) && seen.add(baseName(v)));
+  };
+  const VOICE_LIST = 5; // how many exact voices Settings offers
   function pickVoice() {
     const vs = englishVoices();
     const want = profile.voice || "";
-    return vs.find((v) => v.voiceURI === want) ||
+    const all = "speechSynthesis" in window ? speechSynthesis.getVoices() : [];
+    return all.find((v) => v.voiceURI === want) || // an exact choice, even one the short list leaves out
       (want === "female" || want === "male" ? vs.find((v) => voiceKind(v) === want) : null) ||
       vs.find((v) => v.lang === "en-GB") || vs[0] || null;
   }
@@ -907,14 +925,17 @@
   function fillVoices() {
     const vs = englishVoices();
     const want = profile.voice || "";
-    const exact = vs.some((v) => v.voiceURI === want);
+    const saved = ("speechSynthesis" in window ? speechSynthesis.getVoices() : []).find((v) => v.voiceURI === want);
+    const exact = !!saved;
     // Tick what will actually be used: a kind this device has no voice for shows as Automatic.
     const kind = (want === "female" || want === "male") && vs.some((v) => voiceKind(v) === want) ? want : "";
     for (const b of $("#segVoice").children) {
       b.setAttribute("aria-checked", String(!exact && b.dataset.voice === kind));
       b.disabled = !!b.dataset.voice && !vs.some((v) => voiceKind(v) === b.dataset.voice); // none of that kind here
     }
-    $("#voiceSel").innerHTML = `<option value="">Exact voice: none (use the choice above)</option>` + vs.map((v) => {
+    const shown = vs.slice(0, VOICE_LIST);
+    if (saved && !shown.includes(saved)) shown.push(saved); // keep a saved choice in the list
+    $("#voiceSel").innerHTML = `<option value="">Exact voice: none (use the choice above)</option>` + shown.map((v) => {
       const about = [ACCENTS[v.lang] || v.lang, voiceKind(v)].filter(Boolean).join(", ");
       return `<option value="${escapeHtml(v.voiceURI)}">${escapeHtml(v.name)} (${escapeHtml(about)})</option>`;
     }).join("");
