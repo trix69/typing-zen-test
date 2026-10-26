@@ -22,7 +22,7 @@
   // this version it becomes the first user (v1 itself is left as it was).
   const KEY = "typingZen.v2-test";
   const OLD_KEY = "typingZen.v1-test";
-  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "" });
+  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "karen" });
   // Names start with a capital letter. A blank name stays blank: the welcome form asks for one.
   const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : ""; };
   const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -266,43 +266,26 @@
 
   // Speaks each text in turn with a one-second pause between them.
   // Any new call (or leaving the game) stops a sequence that is still playing.
-  // The voice for words and sentences (user's request, 2026-10-27), saved per user as profile.voice:
-  // "" = Automatic, "female" or "male" = the best English voice of that kind, or a voiceURI for an exact
-  // voice. Each device has its own voices, so a choice it can't meet falls back to Automatic: British
-  // English first, then any English voice. Browsers don't say whether a voice is female or male, so it is
-  // guessed from the voice's name (the common Apple, Google and Microsoft voices).
-  const FEMALE = /female|samantha|serena|karen|kate|moira|tessa|fiona|victoria|allison|\bava\b|susan|zira|hazel|libby|sonia|martha|catherine|nicky|veena|stephanie|emma|olivia|natasha|jenny|aria|kathy|vicki|zoe|siobhan|maisie|amy/i;
-  const MALE = /\bmale\b|daniel|arthur|oliver|alex\b|fred\b|\btom\b|aaron|george|ryan|thomas|david|mark\b|james|\blee\b|rishi|guy\b|eric\b|christopher|brian|gordon|ralph|albert|bruce|william|harry|noah|liam|jamie/i;
-  const voiceKind = (v) => (FEMALE.test(v.name) ? "female" : MALE.test(v.name) ? "male" : "");
-  const ACCENTS = { "en-GB": "British", "en-US": "American", "en-AU": "Australian", "en-IE": "Irish", "en-IN": "Indian",
-    "en-ZA": "South African", "en-NZ": "New Zealand", "en-CA": "Canadian", "en-SG": "Singapore" };
-  // Devices list many voices, some joke voices and some the same voice once per accent. So: leave out the
-  // novelty voices, keep one of each name (British first), and rank the well-known natural voices first
-  // (user's request, 2026-10-27: "limit to top 5 popular ones").
-  const NOVELTY = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley|junior|ralph|kathy|fred)\b/i;
-  const POPULAR = ["google uk english female", "google uk english male", "daniel", "serena", "kate", "oliver", "arthur",
-    "martha", "microsoft sonia", "microsoft libby", "microsoft ryan", "microsoft hazel", "microsoft george", "samantha",
-    "google us english", "ava", "allison", "alex", "tom", "microsoft aria", "microsoft jenny", "microsoft guy", "karen", "moira", "rishi"];
-  const voiceRank = (v) => {
-    const n = v.name.toLowerCase(), i = POPULAR.findIndex((p) => n.startsWith(p));
-    return (i < 0 ? 1000 : i * 10) + (v.lang === "en-GB" ? 0 : 1);
+  // The voice for words and sentences, saved per user as profile.voice: one of the three voices the user
+  // chose (2026-10-27: Daniel, Samantha, Karen; no Automatic, Female or Male). They are Apple voices, so a
+  // device without the chosen one (Windows, Android) uses its own English voice: British first.
+  const VOICES = [
+    { id: "daniel", name: "Daniel", about: "British, male" },
+    { id: "samantha", name: "Samantha", about: "American, female" },
+    { id: "karen", name: "Karen", about: "Australian, female" },
+  ];
+  // Karen until the user chooses (user's request, 2026-10-27). Earlier versions saved "", "female", "male" or a
+  // voiceURI; anything that isn't one of the three counts as not chosen yet.
+  const voiceId = () => (VOICES.some((x) => x.id === profile.voice) ? profile.voice : "karen");
+  const englishVoices = () => ("speechSynthesis" in window ? speechSynthesis.getVoices() : []).filter((v) => /^en([-_]|$)/i.test(v.lang));
+  // The device's voice for one of the three: "Daniel" before "Daniel (Enhanced)" and the like.
+  const deviceVoice = (id, vs = englishVoices()) => {
+    const named = vs.filter((v) => new RegExp("^" + id + "\\b", "i").test(v.name));
+    return named.find((v) => v.name.toLowerCase() === id) || named[0] || null;
   };
-  const baseName = (v) => v.name.replace(/\s*\(.*\)\s*$/, "").trim().toLowerCase();
-  const englishVoices = () => {
-    const all = ("speechSynthesis" in window ? speechSynthesis.getVoices() : [])
-      .filter((v) => /^en([-_]|$)/i.test(v.lang) && !NOVELTY.test(v.name))
-      .sort((a, b) => voiceRank(a) - voiceRank(b) || a.name.localeCompare(b.name));
-    const seen = new Set();
-    return all.filter((v) => !seen.has(baseName(v)) && seen.add(baseName(v)));
-  };
-  const VOICE_LIST = 5; // how many exact voices Settings offers
   function pickVoice() {
     const vs = englishVoices();
-    const want = profile.voice || "";
-    const all = "speechSynthesis" in window ? speechSynthesis.getVoices() : [];
-    return all.find((v) => v.voiceURI === want) || // an exact choice, even one the short list leaves out
-      (want === "female" || want === "male" ? vs.find((v) => voiceKind(v) === want) : null) ||
-      vs.find((v) => v.lang === "en-GB") || vs[0] || null;
+    return deviceVoice(voiceId(), vs) || vs.find((v) => v.lang.replace("_", "-") === "en-GB") || vs[0] || null;
   }
   let speechRun = 0;
   let speakTimer = 0; // the short wait before a new item is spoken; cleared by stopSpeech()
@@ -920,38 +903,20 @@
     </svg>`;
   $("#segSound").innerHTML = SWITCH_LOOK.map(([id, name, how, colour, extra]) =>
     `<button type="button" role="radio" aria-checked="false" data-sound="${id}" aria-label="${name}" title="${name}: ${how}">${switchPicture(colour, extra)}</button>`).join("");
-  // Voice: Automatic / Female / Male, then the exact English voices this device has, each labelled with its
-  // accent and kind. Voices can arrive after the page loads (voiceschanged).
+  // Voice: the three voices; one this device doesn't have is greyed out. Voices can arrive after the page
+  // loads (voiceschanged).
   const SAMPLE = "This is how I will read your words.";
   function fillVoices() {
     const vs = englishVoices();
-    const want = profile.voice || "";
-    const saved = ("speechSynthesis" in window ? speechSynthesis.getVoices() : []).find((v) => v.voiceURI === want);
-    const exact = !!saved;
-    // Tick what will actually be used: a kind this device has no voice for shows as Automatic.
-    const kind = (want === "female" || want === "male") && vs.some((v) => voiceKind(v) === want) ? want : "";
-    for (const b of $("#segVoice").children) {
-      b.setAttribute("aria-checked", String(!exact && b.dataset.voice === kind));
-      b.disabled = !!b.dataset.voice && !vs.some((v) => voiceKind(v) === b.dataset.voice); // none of that kind here
-    }
-    const shown = vs.slice(0, VOICE_LIST);
-    if (saved && !shown.includes(saved)) shown.push(saved); // keep a saved choice in the list
-    $("#voiceSel").innerHTML = `<option value="">Exact voice: none (use the choice above)</option>` + shown.map((v) => {
-      const about = [ACCENTS[v.lang] || v.lang, voiceKind(v)].filter(Boolean).join(", ");
-      return `<option value="${escapeHtml(v.voiceURI)}">${escapeHtml(v.name)} (${escapeHtml(about)})</option>`;
+    $("#voiceSel").innerHTML = VOICES.map((x) => {
+      const here = !!deviceVoice(x.id, vs);
+      return `<option value="${x.id}"${here ? "" : " disabled"}>${x.name} (${x.about}${here ? "" : ", not on this device"})</option>`;
     }).join("");
-    $("#voiceSel").value = exact ? want : "";
+    $("#voiceSel").value = voiceId();
+    $("#voiceNote").hidden = !vs.length || VOICES.some((x) => deviceVoice(x.id, vs));
     $("#voiceRow").hidden = !("speechSynthesis" in window);
   }
   if ("speechSynthesis" in window && speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged", fillVoices);
-  $("#segVoice").addEventListener("click", (e) => {
-    const b = e.target.closest("button");
-    if (!b || b.disabled) return;
-    profile.voice = b.dataset.voice;
-    save();
-    fillVoices();
-    speak(SAMPLE);
-  });
   $("#voiceSel").addEventListener("change", (e) => { profile.voice = e.target.value; save(); fillVoices(); speak(SAMPLE); });
   $("#voiceTry").addEventListener("click", () => speak(SAMPLE));
   // Key sound: choosing one plays a sample of it.

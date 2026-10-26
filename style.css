@@ -190,6 +190,7 @@ kbd {
 }
 .voice-row select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .voice-row button { height: 42px; }
+.voice-row + .note { margin-top: 6px; }
 /* Tighter headings and smaller pictures on very narrow phones, so less of Settings needs scrolling (Hermes R14.1). */
 @media (max-width: 360px) {
   .sheet-card h3 { margin: 10px 0 6px; }
