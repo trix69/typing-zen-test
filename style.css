@@ -332,6 +332,9 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .kbd .thumb { background: var(--f-thumb); --edge: var(--e-thumb); }
 .kbd .key.next { background: var(--accent); color: var(--on-accent); border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); }
 .kbd .key.hit { transform: translateY(2px); }
+/* Keys can be tapped or clicked (see tapKey in app.js). */
+.kbd .key { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.kbd .key:active { transform: translateY(2px); }
 .kbd .key.held { background: var(--sunk); transform: translateY(2px); }
 .kbd .key.locked { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .kbd .key.locked::before { content: ""; position: absolute; top: 6px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
@@ -402,6 +405,13 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   .topbar { gap: 8px; }
   .topbar .title { flex-basis: 100%; order: -1; }
   .topbar .live { margin-left: auto; font-size: 0.85rem; }
+  /* Tighter spacing on phones, so the whole on-screen keyboard fits below the word for tapping. */
+  .app { padding-block: 12px 16px; }
+  .screen { gap: 12px; }
+  .stage { padding: 14px 12px; gap: 10px; min-height: 0; border-radius: 16px; }
+  .card { gap: 6px; }
+  .card .meaning, .card .clue { font-size: 1rem; }
+  .finger { font-size: 0.85rem; min-height: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

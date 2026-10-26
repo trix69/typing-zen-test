@@ -115,6 +115,7 @@
     keyEl("caps").classList.toggle("locked", capsOn);
   }
   function readModifiers(e) {
+    if (e.fromScreen) return; // a tap on the on-screen keyboard: Shift and Caps Lock are set by tapKey()
     const caps = e.getModifierState ? e.getModifierState("CapsLock") : capsOn;
     if (caps === capsOn && e.shiftKey === shiftHeld) return;
     const capsChanged = caps !== capsOn;
@@ -126,6 +127,45 @@
   document.addEventListener("keydown", readModifiers);
   document.addEventListener("keyup", readModifiers);
   window.addEventListener("blur", () => { shiftHeld = false; refreshKeyboard(); });
+
+  // ---------- Tapping or clicking the on-screen keyboard ----------
+  // Each key types what it shows (user's request, 2026-10-27, for touch screens and the mouse): the tap is
+  // sent through the same keydown handler as a real key. The on-screen Shift works for the next key only,
+  // and Caps Lock toggles. Tab, backspace, ctrl and alt type nothing, as on the real keyboard in the games.
+  let screenShift = false;
+  function tapKey(id) {
+    if (id === "shift-l" || id === "shift-r") {
+      screenShift = shiftHeld = !screenShift;
+      return refreshKeyboard();
+    }
+    if (id === "caps") {
+      capsOn = !capsOn;
+      refreshKeyboard();
+      if (game && !$("#play").hidden) showNextKey(); // Shift may now be needed or not
+      return;
+    }
+    let key = null;
+    if (id === "enter") key = "Enter";
+    else if (id === " ") key = " ";
+    else if (id.length === 1) {
+      const isLetter = id !== id.toUpperCase();
+      key = isLetter ? (shiftHeld !== capsOn ? id.toUpperCase() : id) : shiftHeld ? SHIFT_LABEL[id] || id : id;
+    }
+    if (!key) return;
+    const ev = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+    ev.fromScreen = true;
+    document.dispatchEvent(ev);
+    if (screenShift) {
+      screenShift = shiftHeld = false;
+      refreshKeyboard();
+    }
+  }
+  $("#kbd").addEventListener("pointerdown", (e) => {
+    const k = e.target.closest(".key");
+    if (!k) return;
+    e.preventDefault(); // no text selection, no focus change, no double-tap zoom
+    tapKey(k.dataset.key);
+  });
 
   // ---------- Sound ----------
   let audio;
