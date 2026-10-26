@@ -348,6 +348,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; width: 100%; max-width: 620px; }
 .figures div { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 8px; }
 .figures b { font: 700 2rem var(--font-display); font-variant-numeric: tabular-nums; color: var(--accent); }
+#resStruggled { color: var(--koi); } /* "needed another try" stands apart from the green "right first try" */
 .figures span { font: 500 0.75rem var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .tricky-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
 .tricky-list span { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 2px 12px; font: 1.05rem var(--font-type); }
@@ -372,7 +373,13 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .segc button + button { border-left: 1px solid var(--line); }
 .segc button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); }
 .segc button:focus-visible, .sheet-done:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
-.ver { margin: 14px 0 0; text-align: center; font: 500 12px var(--font-mono); letter-spacing: 0.04em; color: var(--muted); }
+/* "Version x · Check for updates" (like Violin Toolkit's): a quiet text button. */
+.ver {
+  display: block; margin: 12px auto 0; padding: 6px 10px; min-height: 32px; border: 0; border-radius: 8px;
+  background: transparent; text-align: center; font: 500 12px var(--font-mono); letter-spacing: 0.04em; color: var(--muted);
+}
+.ver:hover { color: var(--fg); }
+.ver:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .sheet-done {
   position: sticky; bottom: 0; box-shadow: 0 -10px 12px var(--panel);
   margin-top: 18px; width: 100%; height: 46px; border: 0; border-radius: 12px;

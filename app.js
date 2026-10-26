@@ -695,6 +695,7 @@
   }
   function openSheet() {
     syncSheet();
+    $("#verMsg").textContent = "Check for updates";
     sheet.hidden = false;
     document.addEventListener("keydown", onSheetKey);
     $("#sheetCard").focus();
@@ -714,6 +715,25 @@
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
   $("#settingsBtn").addEventListener("click", openSheet);
+  // "Check for updates" (like Violin Toolkit): compares this page with the site's version.json, never cached.
+  // The test build also stamps a build time on both, so a new test deploy counts as an update. If they differ
+  // it opens the new version with ?v= in the address: index.html stamps its own files with the version, so the
+  // browser fetches fresh copies instead of reusing old ones.
+  $("#verBtn").addEventListener("click", async () => {
+    const msg = $("#verMsg"), mine = $("#appVersion");
+    msg.textContent = "Checking…";
+    try {
+      const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const live = await r.json();
+      const same = mine.dataset.build ? live.build === mine.dataset.build : live.version === mine.textContent;
+      if (same) { msg.textContent = "Up to date"; return; }
+      msg.textContent = `Updating to ${live.version}…`;
+      location.replace(location.pathname + "?v=" + encodeURIComponent(live.build || live.version));
+    } catch {
+      msg.textContent = navigator.onLine === false ? "Can't check while offline" : "Can't check here";
+    }
+  });
   $("#sheetDone").addEventListener("click", closeSheet);
   sheet.addEventListener("click", (e) => { if (e.target === sheet) closeSheet(); });
   $("#segApp").addEventListener("click", (e) => {
