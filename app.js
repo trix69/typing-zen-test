@@ -757,6 +757,11 @@
     for (const x of $("#newYear").children) x.setAttribute("aria-checked", String(x === b));
     setError("year", "");
   });
+  // Enter on a year button submits the form, as it does in the name box (a type="button" alone wouldn't).
+  // Focus stays on the chosen year.
+  $("#newYear").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); $("#newForm").requestSubmit(); }
+  });
   $("#newName").addEventListener("input", () => setError("name", ""));
   $("#newForm").addEventListener("submit", (e) => {
     e.preventDefault();

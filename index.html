@@ -44,7 +44,8 @@
 <div class="app">
 
   <!-- WELCOME: who is typing (first visit: name and year; later: welcome back) -->
-  <section id="welcome" class="screen" hidden>
+  <!-- Shown first (its panels stay hidden until app.js picks one), so nothing else paints before the script runs. -->
+  <section id="welcome" class="screen">
     <header class="brand">
       <div class="pebbles" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="brand-text">
@@ -93,7 +94,7 @@
   </section>
 
   <!-- HOME -->
-  <section id="home" class="screen">
+  <section id="home" class="screen" hidden>
     <header class="brand">
       <div class="pebbles" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="brand-text">
