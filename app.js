@@ -148,6 +148,7 @@
   // Speaks each text in turn with a one-second pause between them.
   // Any new call (or leaving the game) stops a sequence that is still playing.
   let speechRun = 0;
+  let speakTimer = 0; // the short wait before a new item is spoken; cleared by stopSpeech()
   function speak(...texts) {
     const run = ++speechRun;
     if (profile.mute || !("speechSynthesis" in window)) return;
@@ -164,7 +165,7 @@
     };
     say(0);
   }
-  const stopSpeech = () => { speechRun++; if ("speechSynthesis" in window) speechSynthesis.cancel(); };
+  const stopSpeech = () => { clearTimeout(speakTimer); speechRun++; if ("speechSynthesis" in window) speechSynthesis.cancel(); };
 
   // ---------- Building a round ----------
   const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -314,9 +315,11 @@
     if (!game.endsAt) [...$("#trail").children].forEach((el, i) => { el.className = i < game.idx ? "done" : i === game.idx ? "now" : ""; });
     renderCard(it);
     renderLine();
-    if (it.hidden && !it.open) setTimeout(() => speak(it.word, it.sentence), 250);
-    else if (game.mode === "words") setTimeout(() => speak(it.word), 250);
-    else if (game.mode === "sentences") setTimeout(() => speak(it.sentence), 250);
+    // Kept in speakTimer, so leaving or the end of a timed game stops a word that hasn't been spoken yet.
+    clearTimeout(speakTimer);
+    if (it.hidden && !it.open) speakTimer = setTimeout(() => speak(it.word, it.sentence), 250);
+    else if (game.mode === "words") speakTimer = setTimeout(() => speak(it.word), 250);
+    else if (game.mode === "sentences") speakTimer = setTimeout(() => speak(it.sentence), 250);
   }
 
   function renderCard(it) {
@@ -499,23 +502,33 @@
     if (game.over) return;
     game.over = true;
     stopSpeech();
-    if (game.itemStart !== null) game.ms += performance.now() - game.itemStart; // time on the unfinished word
+    // A word left half typed when time runs out isn't counted at all: its keys come out of accuracy and
+    // speed, as it's in neither word list (every typed letter was a correct key, every miss raised itemErr).
+    if (game.itemStart !== null) {
+      game.correct -= game.typed.length;
+      game.errors -= game.itemErr;
+    }
     game.itemStart = null;
     saveSession(true);
+    const done = game.endsAt ? game.firstTry.length + game.struggled.length : game.items.length;
     const acc = accuracy();
     const speed = wpm(game.correct, game.ms);
-    const stars = acc >= 95 ? 3 : acc >= 85 ? 2 : 1;
+    // No words done (a timed game where time ran out first) earns no stars and no round.
+    const stars = !done ? 0 : acc >= 95 ? 3 : acc >= 85 ? 2 : 1;
     const newBest = speed > profile.bestWpm && game.mode !== "fixit";
-    profile.stars += stars;
-    profile.rounds++;
+    if (done) {
+      profile.stars += stars;
+      profile.rounds++;
+    }
     if (newBest) profile.bestWpm = speed;
     save();
 
     $("#stars").innerHTML = [1, 2, 3].map((i) => `<span class="${i <= stars ? "" : "off"}">⭐</span>`).join("");
     const who = profile.name ? `, ${escapeHtml(profile.name)}` : "";
-    $("#resTitle").innerHTML = (stars === 3 ? `Wonderful${who}!` : stars === 2 ? `Well done${who}!` : `Good effort${who}!`) + (newBest ? " New best speed!" : "");
+    $("#resTitle").innerHTML = !done ? `Time's up${who}! No words this time.`
+      : (stars === 3 ? `Wonderful${who}!` : stars === 2 ? `Well done${who}!` : `Good effort${who}!`) + (newBest ? " New best speed!" : "");
     $("#resWpm").textContent = speed;
-    $("#resAcc").textContent = acc + "%";
+    $("#resAcc").textContent = done ? acc + "%" : "–"; // nothing typed: no accuracy to claim
     $("#resItems").textContent = game.items.length;
     $("#resFirst").textContent = game.firstTry.length;
     $("#resStruggled").textContent = game.struggled.length;
