@@ -750,17 +750,25 @@
   }
 
   $("#newYear").innerHTML = BUCKETS.map((b) => `<button type="button" role="radio" aria-checked="false" data-year="${b.name}">${b.label}</button>`).join("");
-  $("#newYear").addEventListener("click", (e) => {
-    const b = e.target.closest("button");
-    if (!b) return;
+  function chooseYear(b) {
     newYear = b.dataset.year;
     for (const x of $("#newYear").children) x.setAttribute("aria-checked", String(x === b));
     setError("year", "");
+  }
+  $("#newYear").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (b) chooseYear(b);
   });
-  // Enter on a year button submits the form, as it does in the name box (a type="button" alone wouldn't).
-  // Focus stays on the chosen year.
+  // Enter on a year: an unchosen year is chosen (as a click would), Enter on the chosen year submits the
+  // form, as Enter in the name box does. Focus stays where it is. (Hermes R3.2, R3.3.)
   $("#newYear").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); $("#newForm").requestSubmit(); }
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const b = e.target.closest("button");
+    if (b && b.dataset.year !== newYear) return chooseYear(b);
+    const form = $("#newForm");
+    if (form.requestSubmit) form.requestSubmit();
+    else form.querySelector('[type="submit"]').click(); // Safari before 16
   });
   $("#newName").addEventListener("input", () => setError("name", ""));
   $("#newForm").addEventListener("submit", (e) => {
