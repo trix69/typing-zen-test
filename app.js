@@ -437,6 +437,7 @@
   }
 
   function updateLive() {
+    if (game.pausedAt) return; // the clock is paused: the live figures stay where they were (Hermes R4.1)
     const ms = game.ms + (game.itemStart ? performance.now() - game.itemStart : 0);
     $("#liveWpm").textContent = wpm(game.correct, ms);
     $("#liveAcc").textContent = accuracy();
