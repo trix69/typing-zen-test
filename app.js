@@ -308,15 +308,20 @@
     for (const v of rest) {
       if (out.length >= 3) break;
       used.add(v);
-      out.push({ id: v.voiceURI, voice: v, accent: ACCENTS[langOf(v)] || v.lang, kind: FEMALE.test(v.name) ? "female" : MALE.test(v.name) ? "male" : "" });
+      out.push(extraVoice(v));
     }
     return out;
   }
-  // The saved choice if this device can meet it, else the Australian woman (the default), else the first woman
-  // listed, else the first entry.
+  const extraVoice = (v) => ({ id: v.voiceURI, voice: v, accent: ACCENTS[langOf(v)] || v.lang,
+    kind: FEMALE.test(v.name) ? "female" : MALE.test(v.name) ? "male" : "" });
+  // The saved choice if this device can meet it, even when a changed voice list (Edge's online voices arriving,
+  // a voice pack added) has pushed it out of the three (Hermes R19.1); else the Australian woman (the default),
+  // else a British woman (Chrome on Windows, Hermes R19.2), else the first woman listed, else the first entry.
   function chosenVoice(cs = voiceChoices()) {
     const want = OLD_VOICE[profile.voice] || profile.voice;
-    return cs.find((c) => c.id === want) || cs.find((c) => c.id === "au-female") || cs.find((c) => c.kind === "female") || cs[0] || null;
+    const kept = !cs.some((c) => c.id === want) && englishVoices().find((v) => v.voiceURI === want);
+    return cs.find((c) => c.id === want) || (kept ? extraVoice(kept) : null) || cs.find((c) => c.id === "au-female") ||
+      cs.find((c) => c.kind === "female" && langOf(c.voice) === "en-GB") || cs.find((c) => c.kind === "female") || cs[0] || null;
   }
   function pickVoice() {
     const c = chosenVoice();
@@ -943,15 +948,17 @@
   const SAMPLE = "This is how I will read your words.";
   function fillVoices() {
     const cs = voiceChoices();
+    const c = chosenVoice(cs);
+    if (c && !cs.includes(c) && !cs.some((x) => x.id === c.id)) cs.push(c); // a saved voice outside the three stays listed
     $("#voiceSel").innerHTML = cs.map((c) => {
       const about = [c.accent, c.kind].filter(Boolean).join(", ");
       // "Microsoft Ryan Online (Natural) - English (United Kingdom)" → "Ryan"
       const name = c.voice.name.replace(/\s+-\s+English.*$/, "").replace(/^Microsoft\s+/, "").replace(/\s+Online \(Natural\)$/, "");
       return `<option value="${escapeHtml(c.id)}">${escapeHtml(name)} (${escapeHtml(about)})</option>`;
     }).join("");
-    const c = chosenVoice(cs);
     if (c) $("#voiceSel").value = c.id;
-    $("#voiceNote").hidden = cs.length > 0;
+    // Chrome lists no voices until its first voiceschanged, so the note waits until some voice is listed.
+    $("#voiceNote").hidden = cs.length > 0 || !("speechSynthesis" in window && speechSynthesis.getVoices().length);
     $("#voiceRow").hidden = !("speechSynthesis" in window);
   }
   if ("speechSynthesis" in window && speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged", fillVoices);
