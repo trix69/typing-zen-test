@@ -154,7 +154,7 @@
       const isLetter = id !== id.toUpperCase();
       key = isLetter ? (shiftHeld !== capsOn ? id.toUpperCase() : id) : shiftHeld ? SHIFT_LABEL[id] || id : id;
     }
-    if (!key) return;
+    if (!key) { if (game && !$("#play").hidden) pressSound(id); return; } // tab, backspace, ctrl, alt: a sound only
     const ev = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
     ev.fromScreen = true;
     document.dispatchEvent(ev);
@@ -255,6 +255,7 @@
     if (id) pressSound(id);
   });
   document.addEventListener("keyup", (e) => {
+    if (!game || $("#play").hidden) return sounding.clear(); // left the round with a key still down: no stray release
     const id = soundId(e) || (e.key && e.key.length === 1 ? baseKey(e.key).key : null);
     if (id) releaseSound(id);
   });

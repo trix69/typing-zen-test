@@ -190,7 +190,7 @@ kbd {
 }
 .voice-row select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .voice-row button { height: 42px; }
-/* Tighter headings on very narrow phones, so the version line isn't hidden under the sticky Done (Hermes R14.1). */
+/* Tighter headings and smaller pictures on very narrow phones, so less of Settings needs scrolling (Hermes R14.1). */
 @media (max-width: 360px) {
   .sheet-card h3 { margin: 10px 0 6px; }
   .choices.sounds button { height: 48px; }
@@ -383,7 +383,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .tricky-list span { background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 2px 12px; font: 1.05rem var(--font-type); }
 .actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 
-/* Settings sheet (looks like Violin Toolkit's): a card over a blurred scrim, Done stays on screen on a phone. */
+/* Settings sheet (looks like Violin Toolkit's): a card over a blurred scrim; the options scroll and Done sits below. */
 .sheet {
   position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 20px;
   grid-template-columns: minmax(0, 1fr); /* a long voice name can't make the card wider than the screen */
