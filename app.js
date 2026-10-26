@@ -291,11 +291,12 @@
   // Shows the time left, and ends a timed game at 0:00. A word that is half typed then isn't counted.
   function tickClock() {
     if (!game || !game.endsAt || game.over) return;
-    const left = Math.max(0, game.endsAt - Date.now());
+    const left = Math.max(0, game.endsAt - (game.pausedAt || Date.now())); // frozen while paused
     const secs = Math.ceil(left / 1000);
     const clock = $("#clock");
     clock.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
     clock.classList.toggle("low", secs <= 60);
+    clock.classList.toggle("paused", !!game.pausedAt);
     // The bar fills from the left as time passes, and flashes red near the end.
     const total = MINUTES[game.mode] * 60000;
     const bar = $("#trail .time b");
@@ -303,11 +304,26 @@
       bar.style.width = ((total - left) / total) * 100 + "%";
       bar.classList.toggle("ending", left <= total * ENDING);
     }
-    if (left <= 0 && !$("#play").hidden) finish();
+    if (left <= 0 && !game.pausedAt && !$("#play").hidden) finish();
+  }
+
+  // The clock pauses while "Leave this round?" is on screen (user's request, 2026-10-26). Resuming moves
+  // the end time (and the current word's start, for wpm) on by the paused time, so it isn't counted anywhere.
+  function pauseClock() {
+    if (game.endsAt && !game.pausedAt) { game.pausedAt = Date.now(); tickClock(); }
+  }
+  function resumeClock() {
+    if (!game.pausedAt) return;
+    const paused = Date.now() - game.pausedAt;
+    game.endsAt += paused;
+    if (game.itemStart !== null) game.itemStart += paused;
+    game.pausedAt = null;
+    tickClock();
   }
 
   function loadItem() {
     const it = game.items[game.idx];
+    resumeClock(); // the next word clears a "Leave this round?" that was asked between words
     Object.assign(game, { typed: "", posErr: 0, revealed: false, itemErr: 0, itemStart: null, wait: false, leaving: null });
     $("#msg").className = "msg";
     $("#msg").innerHTML = "";
@@ -487,7 +503,8 @@
   function saveSession(finished) {
     if (!game || !game.endsAt || game.saved) return;
     game.saved = true;
-    const minutes = Math.round((Math.min(Date.now(), game.endsAt) - (game.endsAt - MINUTES[game.mode] * 60000)) / 60000);
+    const now = game.pausedAt || Date.now(); // leaving from the paused question: the pause isn't counted
+    const minutes = Math.round((Math.min(now, game.endsAt) - (game.endsAt - MINUTES[game.mode] * 60000)) / 60000);
     if (!finished && !game.firstTry.length && !game.struggled.length) return; // left before doing anything
     profile.sessions.push({
       date: new Date().toISOString(), game: game.mode, level: currentBucket().name, minutes, finished,
@@ -596,6 +613,7 @@
       $("#msg").className = game.leaving.cls;
       $("#msg").innerHTML = game.leaving.html;
       game.leaving = null;
+      resumeClock();
       if (e.key === "Enter" && game.wait !== "enter") { e.preventDefault(); return; }
     }
     if (game.wait === "enter") { if (e.key === "Enter") { e.preventDefault(); next(); } return; }
@@ -612,7 +630,9 @@
     const msg = $("#msg");
     game.leaving = { cls: msg.className, html: msg.innerHTML };
     msg.className = "msg";
-    msg.innerHTML = `Leave this round? Press <kbd>Esc</kbd> again to go home, or keep typing to stay.`;
+    msg.innerHTML = `Leave this round? Press <kbd>Esc</kbd> again to go home, or keep typing to stay.` +
+      (game.endsAt ? ` <span class="rule">The clock is paused.</span>` : "");
+    pauseClock();
   }
 
   $("#switchUserBtn").addEventListener("click", () => showPanel("switch"));
