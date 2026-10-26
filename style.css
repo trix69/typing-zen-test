@@ -173,6 +173,19 @@ kbd {
 .choices button[aria-checked="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .choices button:hover, .user-list .user:hover { border-color: var(--accent); }
 .intro-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* Welcome back: last 7 days, a line and a daily bar chart (one column per day, today on the right). */
+.week { display: flex; flex-direction: column; gap: 10px; }
+.week-line { margin: 0; color: var(--muted); }
+.week-line b { color: var(--fg); font: 500 1.05em var(--font-mono); font-variant-numeric: tabular-nums; }
+.week-chart { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.week-chart li { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.week-chart .n { font: 500 0.8rem var(--font-mono); color: var(--fg); min-height: 1.2em; font-variant-numeric: tabular-nums; }
+.week-chart .bar { width: 100%; max-width: 40px; height: 80px; display: flex; align-items: flex-end; border-bottom: 1px solid var(--line); }
+.week-chart .bar i { display: block; width: 100%; background: var(--accent); border-radius: 6px 6px 0 0; }
+.week-chart .d { font: 500 0.75rem var(--font-mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.week-chart .r { font: 500 0.75rem var(--font-mono); color: var(--fg); font-variant-numeric: tabular-nums; }
+.week-chart li:last-child .d { color: var(--fg); }
 .user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
 .user-list .user { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; text-align: left; }
 .user-list .user b { font: 700 1.2rem var(--font-type); }

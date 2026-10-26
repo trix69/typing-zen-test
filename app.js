@@ -596,13 +596,8 @@
     $("#userName").textContent = profile.name;
     // Today, from midnight local time: words finished in this user's Spelling Bee sessions, and how many of
     // them were right first try (user's request, 2026-10-26).
-    const today = new Date().toDateString();
-    const todays = profile.sessions.filter((s) => new Date(s.date).toDateString() === today);
-    const first = todays.reduce((n, s) => n + (s.firstTry || 0), 0);
-    const words = first + todays.reduce((n, s) => n + (s.struggled || 0), 0);
-    $("#todayStats").innerHTML = words
-      ? `Today: <b>${words}</b> word${words === 1 ? "" : "s"} practised · <b>${Math.round((first / words) * 100)}%</b> right first try`
-      : "Today: no words yet.";
+    const t = dayTotals(profile)[new Date().toDateString()] || { words: 0, first: 0 };
+    $("#todayStats").innerHTML = t.words ? `Today: ${wordsAndRate(t)}` : "Today: no words yet.";
     const open = unlocked(profile.year);
     for (const b of document.querySelectorAll(".level")) {
       b.disabled = !open.includes(b.dataset.bucket);
@@ -759,6 +754,52 @@
     tickClock();
   }, 1000);
 
+  // ---------- Practice statistics ----------
+  // Words and right-first-try counts per local day ("Mon Oct 26 2026"), from a user's saved sessions. A session
+  // counts on the day it ended (its date). Damaged records are skipped rather than breaking the page.
+  function dayTotals(u) {
+    const days = {};
+    for (const s of u.sessions || []) {
+      const d = s && s.date ? new Date(s.date) : null;
+      if (!d || isNaN(d)) continue;
+      const k = d.toDateString();
+      const t = days[k] || (days[k] = { words: 0, first: 0 });
+      t.first += s.firstTry || 0;
+      t.words += (s.firstTry || 0) + (s.struggled || 0);
+    }
+    return days;
+  }
+  const wordsAndRate = (t) =>
+    `<b>${t.words}</b> word${t.words === 1 ? "" : "s"} practised · <b>${Math.round((t.first / t.words) * 100)}%</b> right first try`;
+
+  // Welcome back: the last 7 days (today and the 6 before) as a line and a daily bar chart (user's request):
+  // each day shows its words practised above the bar and its right-first-try rate under the day name.
+  function renderWeek(u) {
+    const totals = dayTotals(u);
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(12, 0, 0, 0); // midday, so a daylight-saving change can't skip or repeat a day
+      d.setDate(d.getDate() - i);
+      days.push({ d, ...(totals[d.toDateString()] || { words: 0, first: 0 }) });
+    }
+    const week = days.reduce((a, x) => ({ words: a.words + x.words, first: a.first + x.first }), { words: 0, first: 0 });
+    $("#weekLine").innerHTML = week.words ? `Last 7 days: ${wordsAndRate(week)}` : "Last 7 days: no words yet.";
+    const chart = $("#weekChart");
+    chart.hidden = !week.words;
+    if (!week.words) return;
+    const most = Math.max(...days.map((x) => x.words));
+    chart.innerHTML = days.map((x, i) => {
+      const name = i === 6 ? "Today" : x.d.toLocaleDateString("en-GB", { weekday: "short" });
+      const full = x.d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      const rate = x.words ? Math.round((x.first / x.words) * 100) + "%" : "–";
+      const said = x.words ? `${x.words} word${x.words === 1 ? "" : "s"}, ${rate} right first try` : "no words";
+      return `<li aria-label="${full}: ${said}"><span class="n">${x.words || ""}</span>` +
+        `<span class="bar"><i style="height:${x.words ? Math.max(6, (x.words / most) * 100) : 0}%"></i></span>` +
+        `<span class="d">${name}</span><span class="r">${rate}</span></li>`;
+    }).join("");
+  }
+
   // ---------- Who's typing: welcome, new user, switch user ----------
   // First visit: two questions, name and year. Every later visit opens on "Welcome back" with
   // Continue, Switch user and I'm new here (like Violin Toolkit's start overlay).
@@ -769,6 +810,7 @@
     const last = store.users[store.current];
     if (!last) return showPanel("new");
     $("#backName").textContent = last.name;
+    renderWeek(last);
     $("#continueBtn").textContent = `Continue as ${last.name}`;
     showPanel("back");
   }
