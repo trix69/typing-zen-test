@@ -208,11 +208,19 @@ kbd {
 .week-chart { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .week-chart li { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .week-chart .n { font: 500 0.8rem var(--font-mono); color: var(--fg); min-height: 1.2em; font-variant-numeric: tabular-nums; }
-.week-chart .bar { width: 100%; max-width: 40px; height: 80px; display: flex; align-items: flex-end; border-bottom: 1px solid var(--line); }
-.week-chart .bar i { display: block; width: 100%; background: var(--accent); border-radius: 6px 6px 0 0; }
+.week-chart .bar { width: 100%; max-width: 40px; height: 80px; display: flex; flex-direction: column; justify-content: flex-end; border-bottom: 1px solid var(--line); }
+/* Each day: needed another try (orange, on top) over right first try (green), as on the results screen. */
+.week-chart .bar i, .week-key i { display: block; flex: none; width: 100%; background: var(--accent); }
+.week-chart .bar i.again, .week-key i.again { background: var(--koi); }
+.week-chart .bar i:first-child { border-radius: 6px 6px 0 0; }
+.week-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font: 500 0.75rem var(--font-mono); color: var(--muted); }
+.week-key span { display: inline-flex; align-items: center; gap: 6px; }
+.week-key i { width: 10px; height: 10px; border-radius: 3px; }
 .week-chart .d { font: 500 0.75rem var(--font-mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .week-chart .r { font: 500 0.75rem var(--font-mono); color: var(--fg); font-variant-numeric: tabular-nums; }
-.week #missedBtn { align-self: flex-start; }
+/* The colour key and Words to practise share a row, so welcome back still fits a phone on its side. */
+.week-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+.week-foot:not(:has(> :not([hidden]))) { display: none; }
 /* Words to practise: one group per day. */
 .missed-day { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
 .missed-day:first-child { border-top: 0; }
@@ -224,9 +232,10 @@ kbd {
 .reps i.on { background: var(--accent); }
 .week-chart li:last-child .d { color: var(--fg); }
 /* Short screens (a phone on its side): shorter bars and tighter spacing, so the welcome-back buttons fit
-   without scrolling (Hermes R8.1). */
+   without scrolling (Hermes R8.1), also with the Words to practise row under the chart. */
 @media (max-height: 420px) {
-  .week-chart .bar { height: 40px; }
+  .week-chart .bar { height: 30px; }
+  .week-chart li { gap: 2px; }
   .week { gap: 6px; }
   .app { padding-top: 12px; }
   .screen { gap: 14px; }
@@ -234,7 +243,7 @@ kbd {
 }
 @media (max-height: 340px) {
   .brand .tag { display: none; }
-  .week-chart .bar { height: 28px; }
+  .week-chart .bar { height: 20px; }
 }
 .user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
 .user-list .user { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; text-align: left; }

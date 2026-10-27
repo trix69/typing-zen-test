@@ -36,7 +36,7 @@
   window.THEME.apply();
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=2ce29067ac">
+<link rel="stylesheet" href="style.css?v=c0ef5c8bfe">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -79,7 +79,10 @@
       <div class="week">
         <p class="week-line" id="weekLine"></p>
         <ol class="week-chart" id="weekChart" aria-label="Words practised and right first try each day, last 7 days" hidden></ol>
-        <button type="button" class="ghost small" id="missedBtn" aria-haspopup="dialog" hidden>Words to practise</button>
+        <div class="week-foot">
+          <p class="week-key" id="weekKey" aria-hidden="true" hidden><span><i class="first"></i>Right first try</span><span><i class="again"></i>Needed another try</span></p>
+          <button type="button" class="ghost small" id="missedBtn" aria-haspopup="dialog" hidden>Words to practise</button>
+        </div>
       </div>
       <div class="intro-actions">
         <button type="button" class="primary" id="continueBtn">Continue</button>
@@ -215,7 +218,7 @@
       <button type="button" role="radio" aria-checked="false" data-theme-mode="dark">Dark</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="auto">Automatic</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="2ce29067ac">1.02-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="c0ef5c8bfe">1.03-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -231,8 +234,8 @@
     <button type="button" class="sheet-done" id="missedDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=2ce29067ac"></script>
-<script src="data.js?v=2ce29067ac"></script>
-<script src="app.js?v=2ce29067ac"></script>
+<script src="words.js?v=c0ef5c8bfe"></script>
+<script src="data.js?v=c0ef5c8bfe"></script>
+<script src="app.js?v=c0ef5c8bfe"></script>
 </body>
 </html>

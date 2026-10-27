@@ -1095,15 +1095,21 @@
     $("#weekLine").innerHTML = week.words ? `Last 7 days: ${wordsAndRate(week)}` : "Last 7 days: no words yet.";
     const chart = $("#weekChart");
     chart.hidden = !week.words;
+    $("#weekKey").hidden = !week.words;
     if (!week.words) return;
     const most = Math.max(...days.map((x) => x.words));
     chart.innerHTML = days.map((x, i) => {
       const name = i === 6 ? "Today" : x.d.toLocaleDateString("en-GB", { weekday: "short" });
       const full = x.d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
       const rate = x.words ? Math.round((x.first / x.words) * 100) + "%" : "–";
-      const said = x.words ? `${x.words} word${x.words === 1 ? "" : "s"}, ${rate} right first try` : "no words";
+      const again = x.words - x.first;
+      const said = x.words ? `${x.words} word${x.words === 1 ? "" : "s"}: ${x.first} right first try, ${again} needed another try, ${rate} right first try` : "no words";
+      // One bar per day in two colours (user's request, 2026-10-27): needed another try (orange) on top of
+      // right first try (green). Empty parts are left out, so the top one always gets the rounded corners.
+      const h = x.words ? Math.max(6, (x.words / most) * 100) : 0;
+      const part = (cls, n) => (n ? `<i class="${cls}" style="height:${(h * n) / x.words}%"></i>` : "");
       return `<li aria-label="${full}: ${said}"><span class="n">${x.words || ""}</span>` +
-        `<span class="bar"><i style="height:${x.words ? Math.max(6, (x.words / most) * 100) : 0}%"></i></span>` +
+        `<span class="bar">${part("again", again)}${part("first", x.first)}</span>` +
         `<span class="d">${name}</span><span class="r">${rate}</span></li>`;
     }).join("");
   }
