@@ -284,6 +284,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .mode:disabled { opacity: .45; filter: grayscale(1); cursor: not-allowed; }
 .mode .ico { grid-row: span 2; font-size: 2rem; }
 .mode b { font: 700 1.25rem var(--font-display); letter-spacing: -0.01em; }
+.mode b:last-child { grid-row: span 2; } /* a title on its own sits in the middle of the card */
 .mode span:last-child { font-size: 0.9rem; color: var(--muted); }
 .note { color: var(--muted); font-size: 0.9rem; margin: 0; }
 

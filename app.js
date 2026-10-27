@@ -822,25 +822,19 @@
       b.disabled = !open.includes(b.dataset.bucket);
       b.setAttribute("aria-checked", String(b.dataset.bucket === currentBucket().name));
     }
-    $("#levelNote").textContent = `You're in ${yearLabel(profile.year)}, so you can practise ${yearLabel(open[0])} to ${yearLabel(open[2])}. Change your year in Settings.`;
     const parts = [];
     if (profile.rounds) parts.push(`⭐ ${profile.stars} stars`, `🏃 best ${profile.bestWpm} wpm`, `${profile.rounds} rounds played`);
-    $("#homeStats").textContent = parts.length ? parts.join("   ·   ") : "Pick a level and a game to begin.";
+    $("#homeStats").textContent = parts.join("   ·   ");
     $("#clearBtn").hidden = !profile.rounds && !Object.keys(profile.tricky).length;
     $("#clearConfirm").hidden = true;
     const tricky = Object.keys(profile.tricky).length;
     $("#trickyBtn").hidden = tricky === 0;
-    // A word missed in several rounds needs that many clean spellings to clear.
-    const repeats = Object.values(profile.tricky).some((n) => n > 1);
     // Practice: today's words that weren't right first try. Other days are chosen in View stats.
     const todays = (missedByDay(profile)[new Date().toDateString()] || []).length;
     $("#practiseBtn").disabled = !todays;
-    $("#practiseInfo").textContent = todays
-      ? `Type today's ${todays} word${todays === 1 ? " that wasn't" : "s that weren't"} right first try, ${PRACTISE_REPS} times each`
-      : Object.keys(missedByDay(profile)).length ? "Nothing to practise from today. Pick another day in View stats."
-      : "Words you don't get right first try in Spelling Bee come here.";
-    $("#trickyInfo").textContent = `${tricky} word${tricky === 1 ? "" : "s"} you found hard. Spell ${tricky === 1 ? "it" : "each one"} right to clear it` +
-      (repeats ? ", or a few times if you missed it more than once." : ".");
+    // Cards show state only, no instructions (UX-PRINCIPLES.md, Hermes UX.1 and UX.6).
+    $("#practiseInfo").textContent = todays ? `${todays} word${todays === 1 ? "" : "s"} today, ${PRACTISE_REPS} times each` : "None today";
+    $("#trickyInfo").textContent = `${tricky} word${tricky === 1 ? "" : "s"} you found hard`;
     showSoundIcon();
   }
 
