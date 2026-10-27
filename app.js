@@ -1261,10 +1261,10 @@
     save();
   }
   const wordsAndRate = (t) =>
-    `<b>${t.words}</b> word${t.words === 1 ? "" : "s"} practised · <b>${Math.round((t.first / t.words) * 100)}%</b> right first try`;
+    `<b>${t.words}</b> word${t.words === 1 ? "" : "s"} tested · <b>${Math.round((t.first / t.words) * 100)}%</b> right first try`;
 
   // Welcome back: the last 7 days (today and the 6 before) as a line and a daily bar chart (user's request):
-  // each day shows its words practised above the bar and its right-first-try rate under the day name.
+  // each day shows its words tested in Spelling Bee above the bar and its right-first-try rate under the day name.
   function renderWeek(u) {
     const totals = dayTotals(u);
     const days = [];
