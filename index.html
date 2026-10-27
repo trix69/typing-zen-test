@@ -36,7 +36,7 @@
   window.THEME.apply();
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=02b9aa2a29">
+<link rel="stylesheet" href="style.css?v=5f9eb95662">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -114,19 +114,12 @@
 
     <div class="hello">
       <p class="hello-name">Hi, <b id="userName"></b></p>
-      <button type="button" class="ghost small" id="switchUserBtn">Switch user</button>
       <div class="today-row">
         <p class="today" id="todayStats"></p>
         <button type="button" class="ghost small" id="statsBtn">View stats</button>
       </div>
       <div class="history">
         <p class="stats" id="homeStats"></p>
-        <button class="ghost small" id="clearBtn" hidden>Clear history</button>
-        <span class="confirm" id="clearConfirm" hidden>
-          Clear all stars, best speed and tricky words?
-          <button class="danger small" id="clearYes">Yes, clear</button>
-          <button class="ghost small" id="clearNo">Cancel</button>
-        </span>
       </div>
     </div>
 
@@ -224,7 +217,23 @@
       <button type="button" role="radio" aria-checked="false" data-theme-mode="dark">Dark</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="auto">Automatic</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="02b9aa2a29">1.03-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <h3 id="lblUser">User</h3>
+    <div class="user-row">
+      <button type="button" class="ghost small" id="switchUserBtn">Switch user</button>
+      <button type="button" class="ghost small" id="clearBtn">Clear history</button>
+    </div>
+    <div class="clear-confirm" id="clearConfirm" role="alert" hidden>
+      <p id="clearAsk"></p>
+      <div class="user-row">
+        <button type="button" class="danger small" id="clearYes"></button>
+        <button type="button" class="ghost small" id="clearNo">Cancel</button>
+      </div>
+    </div>
+    <div id="installRow" hidden>
+      <h3 id="lblInstall">Add to home screen</h3>
+      <p class="note" id="installHint"></p>
+    </div>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="5f9eb95662">1.03-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -251,8 +260,8 @@
     <button type="button" class="sheet-done" id="missedDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=02b9aa2a29"></script>
-<script src="data.js?v=02b9aa2a29"></script>
-<script src="app.js?v=02b9aa2a29"></script>
+<script src="words.js?v=5f9eb95662"></script>
+<script src="data.js?v=5f9eb95662"></script>
+<script src="app.js?v=5f9eb95662"></script>
 </body>
 </html>

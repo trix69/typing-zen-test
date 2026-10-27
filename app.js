@@ -902,8 +902,6 @@
     const parts = [];
     if (profile.rounds) parts.push(`⭐ ${profile.stars} stars`, `🏃 best ${profile.bestWpm} wpm`, `${profile.rounds} rounds played`);
     $("#homeStats").textContent = parts.join("   ·   ");
-    $("#clearBtn").hidden = !profile.rounds && !Object.keys(profile.tricky).length;
-    $("#clearConfirm").hidden = true;
     const tricky = Object.keys(profile.tricky).length;
     $("#trickyBtn").hidden = tricky === 0;
     // Practice: today's words that weren't right first try. Other days are chosen in View stats.
@@ -1002,7 +1000,7 @@
     pauseClock();
   }
 
-  $("#switchUserBtn").addEventListener("click", () => showPanel("switch"));
+
   $("#levels").innerHTML = BUCKETS.map((b) =>
     `<button class="level" data-bucket="${b.name}" role="radio"><b>${b.label}</b><span>${b.words.length} words, like ${b.sample}</span></button>`).join("");
   $("#levels").addEventListener("click", (e) => {
@@ -1045,13 +1043,44 @@
   });
   $("#lenCancel").addEventListener("click", () => { closeLength(); $('.mode[data-mode="spell"]').focus(); });
   lenSheet.addEventListener("click", (e) => { if (e.target === lenSheet) closeLength(); });
-  $("#clearBtn").addEventListener("click", () => { $("#clearBtn").hidden = true; $("#clearConfirm").hidden = false; });
-  $("#clearNo").addEventListener("click", renderHome);
+  // Add to home screen (user's request, 2026-10-28): the steps for this browser only. Hidden when Typing Zen
+  // already runs from the home screen, or inside another page (the claude.ai copy), where it can't be added.
+  (() => {
+    const ua = navigator.userAgent, standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const edge = /Edg\//.test(ua), firefox = /Firefox\//.test(ua), chrome = /Chrome\//.test(ua) && !edge;
+    const hint = ios ? "Tap the Share button, then Add to Home Screen."
+      : /Android/.test(ua) ? "Tap ⋮ at the top right, then Add to home screen."
+      : edge ? "Click ⋯ at the top right, then Apps, then Install this site as an app."
+      : chrome ? "Click ⋮ at the top right, then Cast, save and share, then Create shortcut."
+      : firefox ? "Drag the padlock in the address bar onto your desktop."
+      : /Safari\//.test(ua) ? "Choose File, then Add to Dock." : "";
+    $("#installHint").textContent = hint;
+    $("#installRow").hidden = !hint || standalone || window.top !== window;
+  })();
+  // Switch user and Clear history live in Settings (user's request, 2026-10-28), so home stays clean.
+  $("#switchUserBtn").addEventListener("click", () => { closeSheet(); showPanel("switch"); });
+  // Clear history asks twice (user's request): what will go, then "are you sure".
+  function showClear(step) {
+    $("#clearConfirm").hidden = !step;
+    $("#clearBtn").hidden = !!step || (!profile.rounds && !Object.keys(profile.tricky).length && !profile.sessions.length);
+    if (!step) return;
+    $("#clearAsk").textContent = step === 1 ? `Clear all stars, best speed, tricky words and history for ${profile.name}?`
+      : "Are you sure? This can't be undone.";
+    $("#clearYes").textContent = step === 1 ? "Yes, clear" : "Yes, clear everything";
+    $("#clearYes").dataset.step = step;
+    $("#clearYes").focus();
+  }
+  $("#clearBtn").addEventListener("click", () => showClear(1));
+  $("#clearNo").addEventListener("click", () => { showClear(0); $("#clearBtn").hidden || $("#clearBtn").focus(); });
   $("#clearYes").addEventListener("click", () => {
+    if ($("#clearYes").dataset.step === "1") return showClear(2);
     // Keeps the name, level, mute, key sound and voice; wipes scores, tricky words and the session history.
     Object.assign(profile, { bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], practised: {}, learned: {}, streak: {}, beeToday: null });
     save();
+    showClear(0);
     renderHome();
+    $("#switchUserBtn").focus();
   });
   // ---------- Settings ----------
   // Appearance is Light, Dark or Automatic. THEME (set up in index.html's <head>) saves it to
@@ -1063,6 +1092,7 @@
     for (const b of $("#segApp").children) b.setAttribute("aria-checked", String(b.dataset.themeMode === THEME.mode));
     for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
     for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (currentSwitch() || "off")));
+    showClear(0);
     for (const b of $("#segOrder").children) b.setAttribute("aria-checked", String(b.dataset.order === (profile.practiseOrder === "random" ? "random" : "order")));
   }
   function openSheet() {

@@ -253,7 +253,10 @@ kbd {
 .user-list .user span { color: var(--muted); font-size: 0.85rem; }
 .history { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .history .stats { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
-.history .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 700; }
+/* Settings > User: Switch user, Clear history and its two-step confirm. */
+.user-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.clear-confirm { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--bad); border-radius: 12px; }
+.clear-confirm p { margin: 0 0 8px; font-weight: 700; }
 button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .danger { background: var(--bad); color: var(--bg); border: 1px solid var(--bad); font-weight: 700; }
 
