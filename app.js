@@ -26,7 +26,7 @@
   // this version it becomes the first user (v1 itself is left as it was).
   const KEY = "typingZen.v2-test";
   const OLD_KEY = "typingZen.v1-test";
-  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "au-female" });
+  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "au-female", practised: {} });
   // Names start with a capital letter. A blank name stays blank: the welcome form asks for one.
   const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : ""; };
   const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -694,6 +694,7 @@
       // Fill the dot now, with the message, not on the next go (so the fifth one shows too; Hermes R20.2).
       const box = $("#card .reps");
       if (box) { box.innerHTML = repsDots(it); box.setAttribute("aria-label", `${it.reps} of ${PRACTISE_REPS} done`); }
+      if (it.reps === PRACTISE_REPS) markPractised(practiceDay, it.word);
     }
     if (it.word && game.mode !== "sentences" && game.mode !== "practise") {
       if (game.itemErr > 0) {
@@ -905,7 +906,7 @@
   $("#clearNo").addEventListener("click", renderHome);
   $("#clearYes").addEventListener("click", () => {
     // Keeps the name, level, mute, key sound and voice; wipes scores, tricky words and the session history.
-    Object.assign(profile, { bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [] });
+    Object.assign(profile, { bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], practised: {} });
     save();
     renderHome();
   });
@@ -1085,6 +1086,17 @@
     return Object.fromEntries(Object.entries(days).filter(([, l]) => l.length)
       .sort(([a], [b]) => new Date(b) - new Date(a)));
   }
+  // Words practised all 5 times stay in Words to practise, shown in green (user's request, 2026-10-27).
+  // profile.practised maps a day (as in missedByDay) to its practised words; days older than 7 are dropped.
+  function markPractised(day, word) {
+    const list = profile.practised[day] || (profile.practised[day] = []);
+    if (!list.includes(word)) list.push(word);
+    const from = new Date();
+    from.setHours(0, 0, 0, 0);
+    from.setDate(from.getDate() - 6);
+    for (const d of Object.keys(profile.practised)) if (!(new Date(d) >= from)) delete profile.practised[d];
+    save();
+  }
   const wordsAndRate = (t) =>
     `<b>${t.words}</b> word${t.words === 1 ? "" : "s"} practised · <b>${Math.round((t.first / t.words) * 100)}%</b> right first try`;
 
@@ -1220,8 +1232,11 @@
     $("#missedDays").innerHTML = Object.entries(missedByDay(u)).map(([day, words]) => {
       const name = day === today ? "Today" : day === yesterday ? "Yesterday"
         : new Date(day).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-      return `<section class="missed-day"><h3>${name} · ${words.length} word${words.length === 1 ? "" : "s"}</h3>
-        <div class="tricky-list">${words.map((w) => `<span>${escapeHtml(w)}</span>`).join("")}</div>
+      const done = (u.practised || {})[day] || [];
+      const count = words.filter((w) => done.includes(w)).length;
+      return `<section class="missed-day"><h3>${name} · ${words.length} word${words.length === 1 ? "" : "s"}${count ? ` · ${count} practised` : ""}</h3>
+        <div class="tricky-list">${words.map((w) => done.includes(w)
+          ? `<span class="done" title="Practised">✓ ${escapeHtml(w)}</span>` : `<span>${escapeHtml(w)}</span>`).join("")}</div>
         <button type="button" class="primary small" data-day="${escapeHtml(day)}">${day === today ? "Practise today's " + (words.length === 1 ? "word" : "words")
           : words.length === 1 ? "Practise this word" : "Practise these words"}</button></section>`;
     }).join("") || `<p class="note">No words to practise from the last 7 days.</p>`;

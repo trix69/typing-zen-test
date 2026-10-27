@@ -226,6 +226,7 @@ kbd {
 .missed-day:first-child { border-top: 0; }
 .missed-day h3 { margin: 0; }
 .missed-day .tricky-list { justify-content: flex-start; margin-top: 0; }
+.missed-day .tricky-list span.done { color: var(--ok); border-color: var(--ok); } /* practised all 5 times */
 /* Practice: five dots, filled for each clean go. */
 .reps { display: flex; gap: 6px; justify-content: center; }
 .reps i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); }
