@@ -903,7 +903,7 @@
     if (profile.rounds) parts.push(`⭐ ${profile.stars} stars`, `🏃 best ${profile.bestWpm} wpm`, `${profile.rounds} rounds played`);
     $("#homeStats").textContent = parts.join("   ·   ");
     const tricky = Object.keys(profile.tricky).length;
-    $("#trickyBtn").hidden = tricky === 0;
+    // Sentence Stream, Fix-It and Tricky Words are hidden on home (user's request, 2026-10-28); their code stays.
     // Practice: today's words that weren't right first try. Other days are chosen in View stats.
     const todays = (missedByDay(profile)[new Date().toDateString()] || []).length;
     $("#practiseBtn").disabled = !todays;
@@ -1043,23 +1043,40 @@
   });
   $("#lenCancel").addEventListener("click", () => { closeLength(); $('.mode[data-mode="spell"]').focus(); });
   lenSheet.addEventListener("click", (e) => { if (e.target === lenSheet) closeLength(); });
-  // Use offline (user's request, 2026-10-28): how to add Typing Zen to the home screen in this browser, which
-  // then works without the internet (sw.js keeps the offline copy). Hidden when Typing Zen
-  // already runs from the home screen, or inside another page (the claude.ai copy), where it can't be added.
+  // Use offline (user's request, 2026-10-28, the same design as Violin Toolkit's): a button in Settings opens
+  // steps for iPhone / iPad, Android and Mac / PC, starting on this device's. Hidden when Typing Zen already runs
+  // from the home screen, or inside another page (the claude.ai copy), where it can't be added.
+  const howto = $("#howto");
   (() => {
-    const ua = navigator.userAgent, standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    const ua = navigator.userAgent, standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
     const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    const edge = /Edg\//.test(ua), firefox = /Firefox\//.test(ua), chrome = /Chrome\//.test(ua) && !edge;
-    const steps = ios ? "Tap the Share button, then Add to Home Screen."
-      : /Android/.test(ua) ? "Tap ⋮ at the top right, then Add to home screen (or Install app)."
-      : edge ? "Click ⋯ at the top right, then Apps, then Install this site as an app."
-      : chrome ? "Click the install icon in the address bar, or ⋮ then Cast, save and share, then Install page as app."
-      : /Safari\//.test(ua) && !firefox ? "Choose File, then Add to Dock." : "";
-    // Firefox can't install apps; it still keeps the offline copy, so just say that.
-    const hint = steps ? `${steps} Open it once with the internet on; after that it works offline.`
-      : firefox ? "Typing Zen works offline in this browser once it has been opened with the internet on." : "";
-    $("#installHint").textContent = hint;
-    $("#installRow").hidden = !hint || standalone || window.top !== window;
+    $("#installRow").hidden = standalone || window.top !== window;
+    const showDev = (d) => {
+      for (const b of $("#segDev").children) b.setAttribute("aria-checked", String(b.dataset.dev === d));
+      $("#stepsIos").hidden = d !== "ios";
+      $("#stepsAndroid").hidden = d !== "android";
+      $("#stepsDesktop").hidden = d !== "desktop";
+      $("#howtoDesk").hidden = d !== "desktop";
+    };
+    const close = () => { howto.hidden = true; document.removeEventListener("keydown", onKey, true); $("#openHowto").focus(); };
+    // Esc and Tab here only (capture, so Settings underneath doesn't also take them).
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); return close(); }
+      if (e.key !== "Tab") return;
+      e.stopImmediatePropagation();
+      const items = [...howto.querySelectorAll("button")], i = items.indexOf(document.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); items[items.length - 1].focus(); }
+      else if (!e.shiftKey && i === items.length - 1) { e.preventDefault(); items[0].focus(); }
+    }
+    $("#openHowto").addEventListener("click", () => {
+      showDev(ios ? "ios" : /Android/i.test(ua) ? "android" : "desktop");
+      howto.hidden = false;
+      document.addEventListener("keydown", onKey, true);
+      $("#howtoCard").focus();
+    });
+    $("#segDev").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) showDev(b.dataset.dev); });
+    $("#howtoDone").addEventListener("click", close);
+    howto.addEventListener("click", (e) => { if (e.target === howto) close(); });
   })();
   // Switch user and Clear history live in Settings (user's request, 2026-10-28), so home stays clean.
   $("#switchUserBtn").addEventListener("click", () => { closeSheet(); showPanel("switch"); });

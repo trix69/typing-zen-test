@@ -253,6 +253,18 @@ kbd {
 .user-list .user span { color: var(--muted); font-size: 0.85rem; }
 .history { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .history .stats { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Use offline (Violin Toolkit's design): a full-width button in Settings, and an overlay with steps per device. */
+.howto-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; height: 44px; border: 1px solid var(--line); border-radius: 12px; background: transparent; color: var(--fg); font: 500 15px var(--font-body); cursor: pointer; }
+.howto-btn:hover { border-color: var(--accent); }
+.howto-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.howto-btn svg, .howto-steps svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+#howto { z-index: 120; }
+.howto-steps { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: st; display: grid; gap: 10px; }
+.howto-steps li { counter-increment: st; display: flex; align-items: center; gap: 12px; font: 400 15px/1.4 var(--font-body); }
+.howto-steps li::before { content: counter(st); flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); font: 700 13px var(--font-body); }
+.howto-steps li span { flex: 1; }
+.howto-steps li svg { color: var(--muted); width: 22px; height: 22px; }
+.howto-note { margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, transparent); font: 400 13px/1.5 var(--font-body); color: var(--fg); }
 /* Settings > User: Switch user, Clear history and its two-step confirm. */
 .user-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .clear-confirm { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--bad); border-radius: 12px; }

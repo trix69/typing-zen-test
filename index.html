@@ -48,7 +48,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 </script>
 <!-- /pwa -->
-<link rel="stylesheet" href="style.css?v=37e38a5673">
+<link rel="stylesheet" href="style.css?v=232e8281b2">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -147,8 +147,8 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
         <button class="mode" data-mode="words"><span class="ico">🌼</span><b>Word Garden</b></button>
         <button class="mode" data-mode="spell" aria-haspopup="dialog"><span class="ico">🐝</span><b>Spelling Bee</b></button>
         <button class="mode" data-mode="practise" id="practiseBtn" disabled><span class="ico">✏️</span><b>Practice</b><span id="practiseInfo"></span></button>
-        <button class="mode" disabled data-mode="sentences"><span class="ico">🌊</span><b>Sentence Stream</b></button>
-        <button class="mode" disabled data-mode="fixit"><span class="ico">🔧</span><b>Fix-It</b></button>
+        <button class="mode" disabled hidden data-mode="sentences"><span class="ico">🌊</span><b>Sentence Stream</b></button>
+        <button class="mode" disabled hidden data-mode="fixit"><span class="ico">🔧</span><b>Fix-It</b></button>
         <button class="mode" disabled data-mode="tricky" id="trickyBtn" hidden><span class="ico">🎯</span><b>Tricky Words</b><span id="trickyInfo"></span></button>
       </div>
     </div>
@@ -241,13 +241,49 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
         <button type="button" class="ghost small" id="clearNo">Cancel</button>
       </div>
     </div>
-    <div id="installRow" hidden>
+    <div id="installRow">
       <h3 id="lblInstall">Use offline</h3>
-      <p class="note" id="installHint"></p>
+      <button type="button" class="howto-btn" id="openHowto" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M12 8v6m0 0l-2.5-2.5M12 14l2.5-2.5"/><path d="M11 18.5h2"/></svg><span>Use offline on your device</span></button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="37e38a5673">1.03-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="232e8281b2">1.03-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
+  </div>
+</div>
+<!-- USE OFFLINE: how to add Typing Zen to a device (like Violin Toolkit's) -->
+<div class="sheet" id="howto" role="dialog" aria-modal="true" aria-labelledby="howtoTitle" hidden>
+  <div class="sheet-card" id="howtoCard" tabindex="-1">
+    <div class="sheet-body">
+    <h2 id="howtoTitle">Use offline</h2>
+    <div class="segc" role="radiogroup" aria-label="Device" id="segDev">
+      <button type="button" role="radio" aria-checked="false" data-dev="ios">iPhone / iPad</button>
+      <button type="button" role="radio" aria-checked="false" data-dev="android">Android</button>
+      <button type="button" role="radio" aria-checked="false" data-dev="desktop">Mac / PC</button>
+    </div>
+    <ol class="howto-steps" id="stepsIos" hidden>
+      <li><span>Open this page in Safari.</span></li>
+      <li><span>Tap the Share button.</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M7 10H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1"/></svg></li>
+      <li><span>Scroll down and tap Add to Home Screen.</span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8.5v7M8.5 12h7"/></svg></li>
+      <li><span>Keep Open as Web App switched on, then tap Add.</span></li>
+      <li><span>Open it from the new Home Screen icon once while you have internet.</span></li>
+    </ol>
+    <ol class="howto-steps" id="stepsAndroid" hidden>
+      <li><span>Open this page in Chrome.</span></li>
+      <li><span>Tap the menu button.</span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/></svg></li>
+      <li><span>Tap Install app, or Add to Home screen.</span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8.5v7M8.5 12h7"/></svg></li>
+      <li><span>Tap Install to confirm.</span></li>
+      <li><span>Open it from the new icon once while you have internet.</span></li>
+    </ol>
+    <ol class="howto-steps" id="stepsDesktop" hidden>
+      <li><span>Open this page in Chrome or Edge.</span></li>
+      <li><span>Click the install icon at the right end of the address bar.</span><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 7.5v6m0 0l-2.5-2.5M12 13.5l2.5-2.5"/><path d="M8 20.5h8"/></svg></li>
+      <li><span>Click Install to confirm.</span></li>
+      <li><span>Open it from its new icon once while you have internet.</span></li>
+    </ol>
+    <p class="howto-note">Use the app at least once with internet. After that, it also works offline.</p>
+    <p class="howto-note" id="howtoDesk" hidden>No install icon? Open the browser menu and choose Install Typing Zen. In Safari on a Mac, use File, then Add to Dock. Firefox cannot install apps, but the page still opens offline in a browser tab after one visit.</p>
+    </div>
+    <button type="button" class="sheet-done" id="howtoDone">Done</button>
   </div>
 </div>
 <!-- SPELLING BEE: how long (user's request, 2026-10-28) -->
@@ -272,8 +308,8 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <button type="button" class="sheet-done" id="missedDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=37e38a5673"></script>
-<script src="data.js?v=37e38a5673"></script>
-<script src="app.js?v=37e38a5673"></script>
+<script src="words.js?v=232e8281b2"></script>
+<script src="data.js?v=232e8281b2"></script>
+<script src="app.js?v=232e8281b2"></script>
 </body>
 </html>
