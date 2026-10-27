@@ -700,6 +700,10 @@
       if (game.itemErr > 0) {
         profile.tricky[it.word] = (profile.tricky[it.word] || 0) + 1;
         game.missed.add(it.word);
+        // Missed again after practising it today: it needs practice again, so its green tick comes off
+        // (Hermes R23.1). A tick on an earlier day's list stays.
+        const done = profile.practised[new Date().toDateString()];
+        if (done && done.includes(it.word)) done.splice(done.indexOf(it.word), 1);
       } else if (profile.tricky[it.word] && (game.mode === "spell" || game.mode === "tricky")) {
         // Spelling it cleanly from memory earns the word its way off the list.
         if (--profile.tricky[it.word] <= 0) delete profile.tricky[it.word];
