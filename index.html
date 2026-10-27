@@ -36,7 +36,7 @@
   window.THEME.apply();
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=48f77a591f">
+<link rel="stylesheet" href="style.css?v=2ce29067ac">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -79,6 +79,7 @@
       <div class="week">
         <p class="week-line" id="weekLine"></p>
         <ol class="week-chart" id="weekChart" aria-label="Words practised and right first try each day, last 7 days" hidden></ol>
+        <button type="button" class="ghost small" id="missedBtn" aria-haspopup="dialog" hidden>Words to practise</button>
       </div>
       <div class="intro-actions">
         <button type="button" class="primary" id="continueBtn">Continue</button>
@@ -138,6 +139,7 @@
         <button class="mode" disabled data-mode="warm"><span class="ico">⌨️</span><b>Warm-up</b><span>Home row and finger drills</span></button>
         <button class="mode" disabled data-mode="words"><span class="ico">🌼</span><b>Word Garden</b><span>Type a word and learn what it means</span></button>
         <button class="mode" data-mode="spell"><span class="ico">🐝</span><b>Spelling Bee</b><span>Spell as many words as you can in 2 minutes</span></button>
+        <button class="mode" data-mode="practise" id="practiseBtn" disabled><span class="ico">✏️</span><b>Practice</b><span id="practiseInfo">Type the words you found hard, 5 times each</span></button>
         <button class="mode" disabled data-mode="sentences"><span class="ico">🌊</span><b>Sentence Stream</b><span>Type whole sentences with capitals and full stops</span></button>
         <button class="mode" disabled data-mode="fixit"><span class="ico">🔧</span><b>Fix-It</b><span>Find the grammar mistake and type it correctly</span></button>
         <button class="mode" disabled data-mode="tricky" id="trickyBtn" hidden><span class="ico">🎯</span><b>Tricky Words</b><span id="trickyInfo">Words you found hard</span></button>
@@ -213,13 +215,24 @@
       <button type="button" role="radio" aria-checked="false" data-theme-mode="dark">Dark</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="auto">Automatic</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="48f77a591f">1.02-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="2ce29067ac">1.02-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=48f77a591f"></script>
-<script src="data.js?v=48f77a591f"></script>
-<script src="app.js?v=48f77a591f"></script>
+<!-- WORDS TO PRACTISE (over the stats on the welcome screen) -->
+<div class="sheet" id="missedSheet" role="dialog" aria-modal="true" aria-labelledby="missedTitle" hidden>
+  <div class="sheet-card" id="missedCard" tabindex="-1">
+    <div class="sheet-body">
+    <h2 id="missedTitle">Words to practise</h2>
+    <p class="note">Words that weren't right first try in the last 7 days. Practice shows each word and you type it 5 times.</p>
+    <div id="missedDays"></div>
+    </div>
+    <button type="button" class="sheet-done" id="missedDone">Done</button>
+  </div>
+</div>
+<script src="words.js?v=2ce29067ac"></script>
+<script src="data.js?v=2ce29067ac"></script>
+<script src="app.js?v=2ce29067ac"></script>
 </body>
 </html>

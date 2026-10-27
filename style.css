@@ -212,6 +212,16 @@ kbd {
 .week-chart .bar i { display: block; width: 100%; background: var(--accent); border-radius: 6px 6px 0 0; }
 .week-chart .d { font: 500 0.75rem var(--font-mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .week-chart .r { font: 500 0.75rem var(--font-mono); color: var(--fg); font-variant-numeric: tabular-nums; }
+.week #missedBtn { align-self: flex-start; }
+/* Words to practise: one group per day. */
+.missed-day { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
+.missed-day:first-child { border-top: 0; }
+.missed-day h3 { margin: 0; }
+.missed-day .tricky-list { justify-content: flex-start; margin-top: 0; }
+/* Practice: five dots, filled for each clean go. */
+.reps { display: flex; gap: 6px; justify-content: center; }
+.reps i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); }
+.reps i.on { background: var(--accent); }
 .week-chart li:last-child .d { color: var(--fg); }
 /* Short screens (a phone on its side): shorter bars and tighter spacing, so the welcome-back buttons fit
    without scrolling (Hermes R8.1). */

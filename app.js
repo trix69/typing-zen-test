@@ -5,8 +5,12 @@
   const ROUND = { warm: 5, words: 10, spell: 10, sentences: 10, fixit: 10, tricky: 10 };
   const TITLES = {
     warm: "⌨️ Warm-up", words: "🌼 Word Garden", spell: "🐝 Spelling Bee",
-    sentences: "🌊 Sentence Stream", fixit: "🔧 Fix-It", tricky: "🎯 Tricky Words",
+    sentences: "🌊 Sentence Stream", fixit: "🔧 Fix-It", tricky: "🎯 Tricky Words", practise: "✏️ Practice",
   };
+  // Practice (user's request, 2026-10-27): the words of one day that weren't right first try in Spelling Bee.
+  // Each word is shown and typed until it has been typed PRACTISE_REPS times with no wrong key.
+  const PRACTISE_REPS = 5;
+  let practiceDay = ""; // the day being practised, as Date.toDateString()
   // Timed games: Spelling Bee is a 20-minute session with as many words as Luke can manage.
   // Words come in batches of ROUND.spell, and none repeats within a session.
   const MINUTES = { spell: 2 }; // test build only (live: 20)
@@ -448,6 +452,12 @@
         return freshPick(pool, n, (w) => "s:" + w.word).map((w) => ({ ...w, target: w.sentence }));
       case "fixit":
         return freshPick(FIXITS, n, (f) => "f:" + f.right).map((f) => ({ ...f, target: f.right, hidden: true, open: true }));
+      case "practise": {
+        // Shown, not hidden: he copies each word, as many goes as it takes to get 5 clean ones.
+        const known = new Map(allWords().map((w) => [w.word, w]));
+        return (missedByDay(profile)[practiceDay] || []).map((word) =>
+          ({ word, meaning: "", sentence: "", why: "", ...known.get(word), target: word, reps: 0 }));
+      }
     }
   }
 
@@ -535,7 +545,10 @@
     // Kept in speakTimer, so leaving or the end of a timed game stops a word that hasn't been spoken yet.
     clearTimeout(speakTimer);
     if (it.hidden && !it.open) speakTimer = setTimeout(() => speak(it.word, it.sentence), 250);
-    else if (game.mode === "words") speakTimer = setTimeout(() => speak(it.word), 250);
+    else if (game.mode === "words" || (game.mode === "practise" && !it.spoken)) {
+      it.spoken = true; // Practice says the word on its first go only
+      speakTimer = setTimeout(() => speak(it.word), 250);
+    }
     else if (game.mode === "sentences") speakTimer = setTimeout(() => speak(it.sentence), 250);
   }
 
@@ -548,6 +561,12 @@
       card.innerHTML = `<div class="meaning"><b>${escapeHtml(it.word)}</b> means ${escapeHtml(it.meaning)}</div>
         ${tip(it)}
         <div class="tools"><button class="ghost" data-say="word">🔊 Hear it again</button></div>`;
+    } else if (m === "practise") {
+      const dots = Array.from({ length: PRACTISE_REPS }, (_, i) => `<i class="${i < it.reps ? "on" : ""}"></i>`).join("");
+      card.innerHTML = `<div class="tagline">Type it ${PRACTISE_REPS} times with no mistakes</div>
+        <div class="reps" aria-label="${it.reps} of ${PRACTISE_REPS} done">${dots}</div>
+        ${it.meaning ? `<div class="meaning"><b>${escapeHtml(it.word)}</b> means ${escapeHtml(it.meaning)}</div>` : ""}
+        <div class="tools"><button class="ghost" data-say="word">🔊 Hear it</button></div>`;
     } else if (m === "spell" || m === "tricky") {
       card.innerHTML = `<div class="meaning">It means ${escapeHtml(it.meaning)}</div>
         <div class="clue">${blankOut(it.sentence, it.word)}</div>
@@ -667,7 +686,9 @@
     // Timed games count each word: right first try (no wrong key at all), or needed another try.
     if (game.endsAt) (game.itemErr > 0 ? game.struggled : game.firstTry).push(it.word);
 
-    if (it.word && game.mode !== "sentences") {
+    // Practice counts the clean goes; copying a word doesn't change the tricky words.
+    if (game.mode === "practise" && !game.itemErr) it.reps++;
+    if (it.word && game.mode !== "sentences" && game.mode !== "practise") {
       if (game.itemErr > 0) {
         profile.tricky[it.word] = (profile.tricky[it.word] || 0) + 1;
         game.missed.add(it.word);
@@ -684,6 +705,11 @@
       msg.className = "msg good";
       msg.innerHTML = `✓ Fixed it! <span class="rule">${escapeHtml(it.rule)}</span><span class="rule">Press <kbd>Enter</kbd> for the next one.</span>`;
       game.wait = "enter";
+    } else if (game.mode === "practise") {
+      msg.className = "msg good";
+      msg.textContent = game.itemErr ? "That one had a slip, so it doesn't count. Type it again."
+        : it.reps < PRACTISE_REPS ? `✓ ${it.reps} of ${PRACTISE_REPS}. ${praise}` : `✓ ${it.word}: all ${PRACTISE_REPS} done! ${praise}`;
+      setTimeout(next, game.itemErr ? 1200 : 700);
     } else {
       msg.className = "msg good";
       msg.innerHTML = escapeHtml((it.hidden ? `✓ ${it.word}. ` : "✓ ") + praise) +
@@ -697,6 +723,7 @@
     // "Leave this round?" is up (asked just after a word): the next word waits for his answer.
     if (game.leaving) { game.nextWaiting = true; return; }
     if (game.endsAt && (game.pausedAt || Date.now()) >= game.endsAt) return finish(); // time is up: no next word
+    if (game.mode === "practise" && game.items[game.idx].reps < PRACTISE_REPS) return loadItem(); // the same word again
     game.idx++;
     // A timed game never runs out of words: add another batch (if the level has any left).
     if (game.endsAt && game.idx >= game.items.length) game.items.push(...buildItems(game.mode));
@@ -792,6 +819,13 @@
     $("#trickyBtn").hidden = tricky === 0;
     // A word missed in several rounds needs that many clean spellings to clear.
     const repeats = Object.values(profile.tricky).some((n) => n > 1);
+    // Practice: today's words that weren't right first try. Other days are chosen in View stats.
+    const todays = (missedByDay(profile)[new Date().toDateString()] || []).length;
+    $("#practiseBtn").disabled = !todays;
+    $("#practiseInfo").textContent = todays
+      ? `Type today's ${todays} word${todays === 1 ? "" : "s"} that weren't right first try, ${PRACTISE_REPS} times each`
+      : Object.keys(missedByDay(profile)).length ? "Nothing to practise from today. Pick another day in View stats."
+      : "Words you don't get right first try in Spelling Bee come here.";
     $("#trickyInfo").textContent = `${tricky} word${tricky === 1 ? "" : "s"} you found hard. Spell ${tricky === 1 ? "it" : "each one"} right to clear it` +
       (repeats ? ", or a few times if you missed it more than once." : ".");
     showSoundIcon();
@@ -854,7 +888,11 @@
     const b = e.target.closest(".level");
     if (b && !b.disabled) { profile.bucket = b.dataset.bucket; save(); renderHome(); }
   });
-  document.querySelectorAll(".mode").forEach((b) => b.addEventListener("click", () => { b.blur(); start(b.dataset.mode); }));
+  document.querySelectorAll(".mode").forEach((b) => b.addEventListener("click", () => {
+    b.blur();
+    if (b.dataset.mode === "practise") practiceDay = new Date().toDateString();
+    start(b.dataset.mode);
+  }));
   $("#clearBtn").addEventListener("click", () => { $("#clearBtn").hidden = true; $("#clearConfirm").hidden = false; });
   $("#clearNo").addEventListener("click", renderHome);
   $("#clearYes").addEventListener("click", () => {
@@ -1024,6 +1062,21 @@
     }
     return days;
   }
+  // The words that weren't right first try, per local day of the last 7 (newest day first), each word once.
+  function missedByDay(u) {
+    const from = new Date();
+    from.setHours(0, 0, 0, 0);
+    from.setDate(from.getDate() - 6);
+    const days = {};
+    for (const s of u.sessions || []) {
+      const d = s && s.date ? new Date(s.date) : null;
+      if (!d || isNaN(d) || d < from || !Array.isArray(s.struggledWords)) continue;
+      const list = days[d.toDateString()] || (days[d.toDateString()] = []);
+      for (const w of s.struggledWords) if (typeof w === "string" && !list.includes(w)) list.push(w);
+    }
+    return Object.fromEntries(Object.entries(days).filter(([, l]) => l.length)
+      .sort(([a], [b]) => new Date(b) - new Date(a)));
+  }
   const wordsAndRate = (t) =>
     `<b>${t.words}</b> word${t.words === 1 ? "" : "s"} practised · <b>${Math.round((t.first / t.words) * 100)}%</b> right first try`;
 
@@ -1067,6 +1120,9 @@
     $("#backName").textContent = last.name;
     renderWeek(last);
     $("#continueBtn").textContent = `Continue as ${last.name}`;
+    const missed = Object.values(missedByDay(last)).reduce((n, l) => n + l.length, 0);
+    $("#missedBtn").hidden = !missed;
+    $("#missedBtn").textContent = `Words to practise (${missed})`;
     showPanel("back");
   }
   function showPanel(which) {
@@ -1141,6 +1197,48 @@
   });
   $("#newBack").addEventListener("click", showWelcome);
   $("#continueBtn").addEventListener("click", () => useProfile(store.current));
+
+  // Words to practise: an overlay over the stats, one group per day, each with its own Practise button.
+  const missedSheet = $("#missedSheet");
+  function openMissed() {
+    const u = store.users[store.current];
+    const today = new Date().toDateString(), yesterday = new Date(Date.now() - 864e5).toDateString();
+    $("#missedDays").innerHTML = Object.entries(missedByDay(u)).map(([day, words]) => {
+      const name = day === today ? "Today" : day === yesterday ? "Yesterday"
+        : new Date(day).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      return `<section class="missed-day"><h3>${name} · ${words.length} word${words.length === 1 ? "" : "s"}</h3>
+        <div class="tricky-list">${words.map((w) => `<span>${escapeHtml(w)}</span>`).join("")}</div>
+        <button type="button" class="primary small" data-day="${escapeHtml(day)}">Practise ${day === today ? "today's" : "these"} words</button></section>`;
+    }).join("") || `<p class="note">No words to practise from the last 7 days.</p>`;
+    missedSheet.hidden = false;
+    document.addEventListener("keydown", onMissedKey);
+    $("#missedCard").focus();
+  }
+  function closeMissed() {
+    missedSheet.hidden = true;
+    document.removeEventListener("keydown", onMissedKey);
+    $("#missedBtn").focus();
+  }
+  // Esc closes it, and Tab stays inside it (as in Settings).
+  function onMissedKey(e) {
+    if (e.key === "Escape") { e.preventDefault(); return closeMissed(); }
+    if (e.key !== "Tab") return;
+    const items = [...missedSheet.querySelectorAll("button")];
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === $("#missedCard"))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+  $("#missedBtn").addEventListener("click", openMissed);
+  $("#missedDone").addEventListener("click", closeMissed);
+  missedSheet.addEventListener("click", (e) => {
+    if (e.target === missedSheet) return closeMissed();
+    const b = e.target.closest("[data-day]");
+    if (!b) return;
+    closeMissed();
+    useProfile(store.current);
+    practiceDay = b.dataset.day;
+    start("practise");
+  });
   $("#switchBtn").addEventListener("click", () => showPanel("switch"));
   $("#newBtn").addEventListener("click", () => showPanel("new"));
   $("#switchNew").addEventListener("click", () => showPanel("new"));
