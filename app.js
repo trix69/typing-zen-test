@@ -1043,18 +1043,21 @@
   });
   $("#lenCancel").addEventListener("click", () => { closeLength(); $('.mode[data-mode="spell"]').focus(); });
   lenSheet.addEventListener("click", (e) => { if (e.target === lenSheet) closeLength(); });
-  // Add to home screen (user's request, 2026-10-28): the steps for this browser only. Hidden when Typing Zen
+  // Use offline (user's request, 2026-10-28): how to add Typing Zen to the home screen in this browser, which
+  // then works without the internet (sw.js keeps the offline copy). Hidden when Typing Zen
   // already runs from the home screen, or inside another page (the claude.ai copy), where it can't be added.
   (() => {
     const ua = navigator.userAgent, standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
     const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const edge = /Edg\//.test(ua), firefox = /Firefox\//.test(ua), chrome = /Chrome\//.test(ua) && !edge;
-    const hint = ios ? "Tap the Share button, then Add to Home Screen."
-      : /Android/.test(ua) ? "Tap ⋮ at the top right, then Add to home screen."
+    const steps = ios ? "Tap the Share button, then Add to Home Screen."
+      : /Android/.test(ua) ? "Tap ⋮ at the top right, then Add to home screen (or Install app)."
       : edge ? "Click ⋯ at the top right, then Apps, then Install this site as an app."
-      : chrome ? "Click ⋮ at the top right, then Cast, save and share, then Create shortcut."
-      : firefox ? "Drag the padlock in the address bar onto your desktop."
-      : /Safari\//.test(ua) ? "Choose File, then Add to Dock." : "";
+      : chrome ? "Click the install icon in the address bar, or ⋮ then Cast, save and share, then Install page as app."
+      : /Safari\//.test(ua) && !firefox ? "Choose File, then Add to Dock." : "";
+    // Firefox can't install apps; it still keeps the offline copy, so just say that.
+    const hint = steps ? `${steps} Open it once with the internet on; after that it works offline.`
+      : firefox ? "Typing Zen works offline in this browser once it has been opened with the internet on." : "";
     $("#installHint").textContent = hint;
     $("#installRow").hidden = !hint || standalone || window.top !== window;
   })();
@@ -1118,9 +1121,18 @@
   }
   $("#settingsBtn").addEventListener("click", openSheet);
   // "Check for updates" (like Violin Toolkit): compares this page with the site's version.json, never cached.
-  // The test build also stamps a build time on both, so a new test deploy counts as an update. If they differ
-  // it opens the new version with ?v= in the address: index.html stamps its own files with the version, so the
-  // browser fetches fresh copies instead of reusing old ones.
+  // The test build also stamps a build on both, so a new test deploy counts as an update. With the offline copy
+  // (sw.js), it fetches the new copy into the device and reloads; without one, it opens the new version with ?v=
+  // in the address, so the browser fetches fresh files instead of reusing old ones.
+  const CACHE_PREFIX = "typing-zen-test-"; // this site's offline copies (the test build uses typing-zen-test-)
+  // Asks for the new sw.js; it saves the new copy and takes over (skipWaiting + claim). Resolves true once it
+  // has, false if there was nothing new or it took over 60 s.
+  const newCopy = (reg) => new Promise((done) => {
+    const sw = navigator.serviceWorker, t = setTimeout(() => done(false), 60000);
+    sw.addEventListener("controllerchange", () => { clearTimeout(t); done(true); }, { once: true });
+    reg.update().then(() => { if (!reg.installing && !reg.waiting) { clearTimeout(t); done(false); } },
+      () => { clearTimeout(t); done(false); });
+  });
   $("#verBtn").addEventListener("click", async () => {
     const msg = $("#verMsg"), mine = $("#appVersion");
     msg.textContent = "Checking…";
@@ -1131,6 +1143,13 @@
       const same = mine.dataset.build ? live.build === mine.dataset.build : live.version === mine.textContent;
       if (same) { msg.textContent = "Up to date"; return; }
       msg.textContent = `Updating to ${live.version}…`;
+      const sw = navigator.serviceWorker, reg = sw && sw.controller && (await sw.getRegistration());
+      if (reg && !(await newCopy(reg))) {
+        // No new copy came (an old sw.js, say): drop this site's saved copies so the reload fetches everything.
+        const mine = new RegExp("^" + CACHE_PREFIX + "[0-9a-f]{10}$");
+        await Promise.all((await caches.keys()).filter((k) => mine.test(k)).map((k) => caches.delete(k)));
+        await reg.unregister();
+      }
       location.replace(location.pathname + "?v=" + encodeURIComponent(live.build || live.version));
     } catch {
       msg.textContent = navigator.onLine === false ? "Can't check while offline" : "Can't check here";
