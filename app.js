@@ -562,9 +562,8 @@
         ${tip(it)}
         <div class="tools"><button class="ghost" data-say="word">🔊 Hear it again</button></div>`;
     } else if (m === "practise") {
-      const dots = Array.from({ length: PRACTISE_REPS }, (_, i) => `<i class="${i < it.reps ? "on" : ""}"></i>`).join("");
       card.innerHTML = `<div class="tagline">Type it ${PRACTISE_REPS} times with no mistakes</div>
-        <div class="reps" aria-label="${it.reps} of ${PRACTISE_REPS} done">${dots}</div>
+        <div class="reps" role="img" aria-label="${it.reps} of ${PRACTISE_REPS} done">${repsDots(it)}</div>
         ${it.meaning ? `<div class="meaning"><b>${escapeHtml(it.word)}</b> means ${escapeHtml(it.meaning)}</div>` : ""}
         <div class="tools"><button class="ghost" data-say="word">🔊 Hear it</button></div>`;
     } else if (m === "spell" || m === "tricky") {
@@ -582,6 +581,9 @@
         <div class="tools"><button class="ghost" data-hint>💡 Show the rule</button></div>`;
     }
   }
+
+  // Practice's five dots, filled for each clean go.
+  const repsDots = (it) => Array.from({ length: PRACTISE_REPS }, (_, i) => `<i class="${i < it.reps ? "on" : ""}"></i>`).join("");
 
   function renderLine() {
     const it = game.items[game.idx];
@@ -687,7 +689,12 @@
     if (game.endsAt) (game.itemErr > 0 ? game.struggled : game.firstTry).push(it.word);
 
     // Practice counts the clean goes; copying a word doesn't change the tricky words.
-    if (game.mode === "practise" && !game.itemErr) it.reps++;
+    if (game.mode === "practise" && !game.itemErr) {
+      it.reps++;
+      // Fill the dot now, with the message, not on the next go (so the fifth one shows too; Hermes R20.2).
+      const box = $("#card .reps");
+      if (box) { box.innerHTML = repsDots(it); box.setAttribute("aria-label", `${it.reps} of ${PRACTISE_REPS} done`); }
+    }
     if (it.word && game.mode !== "sentences" && game.mode !== "practise") {
       if (game.itemErr > 0) {
         profile.tricky[it.word] = (profile.tricky[it.word] || 0) + 1;
@@ -764,7 +771,8 @@
     const speed = wpm(game.correct, game.ms);
     // No words done (a timed game where time ran out first) earns no stars and no round.
     const stars = !done ? 0 : acc >= 95 ? 3 : acc >= 85 ? 2 : 1;
-    const newBest = speed > profile.bestWpm && game.mode !== "fixit";
+    // Best speed is for typing from memory: not Fix-It or Practice, where the text is on screen (Hermes R20.1).
+    const newBest = speed > profile.bestWpm && game.mode !== "fixit" && game.mode !== "practise";
     if (done) {
       profile.stars += stars;
       profile.rounds++;
@@ -823,7 +831,7 @@
     const todays = (missedByDay(profile)[new Date().toDateString()] || []).length;
     $("#practiseBtn").disabled = !todays;
     $("#practiseInfo").textContent = todays
-      ? `Type today's ${todays} word${todays === 1 ? "" : "s"} that weren't right first try, ${PRACTISE_REPS} times each`
+      ? `Type today's ${todays} word${todays === 1 ? " that wasn't" : "s that weren't"} right first try, ${PRACTISE_REPS} times each`
       : Object.keys(missedByDay(profile)).length ? "Nothing to practise from today. Pick another day in View stats."
       : "Words you don't get right first try in Spelling Bee come here.";
     $("#trickyInfo").textContent = `${tricky} word${tricky === 1 ? "" : "s"} you found hard. Spell ${tricky === 1 ? "it" : "each one"} right to clear it` +
@@ -1214,7 +1222,8 @@
         : new Date(day).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
       return `<section class="missed-day"><h3>${name} · ${words.length} word${words.length === 1 ? "" : "s"}</h3>
         <div class="tricky-list">${words.map((w) => `<span>${escapeHtml(w)}</span>`).join("")}</div>
-        <button type="button" class="primary small" data-day="${escapeHtml(day)}">Practise ${day === today ? "today's" : "these"} words</button></section>`;
+        <button type="button" class="primary small" data-day="${escapeHtml(day)}">${day === today ? "Practise today's " + (words.length === 1 ? "word" : "words")
+          : words.length === 1 ? "Practise this word" : "Practise these words"}</button></section>`;
     }).join("") || `<p class="note">No words to practise from the last 7 days.</p>`;
     missedSheet.hidden = false;
     document.addEventListener("keydown", onMissedKey);
