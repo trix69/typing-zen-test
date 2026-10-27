@@ -36,7 +36,7 @@
   window.THEME.apply();
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=c43c05eecb">
+<link rel="stylesheet" href="style.css?v=22c70b6f8d">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -139,8 +139,8 @@
       <h2 class="label">Choose a game</h2>
       <div class="modes">
         <button class="mode" disabled data-mode="warm"><span class="ico">⌨️</span><b>Warm-up</b></button>
-        <button class="mode" disabled data-mode="words"><span class="ico">🌼</span><b>Word Garden</b></button>
-        <button class="mode" data-mode="spell"><span class="ico">🐝</span><b>Spelling Bee</b></button>
+        <button class="mode" data-mode="words"><span class="ico">🌼</span><b>Word Garden</b></button>
+        <button class="mode" data-mode="spell" aria-haspopup="dialog"><span class="ico">🐝</span><b>Spelling Bee</b></button>
         <button class="mode" data-mode="practise" id="practiseBtn" disabled><span class="ico">✏️</span><b>Practice</b><span id="practiseInfo"></span></button>
         <button class="mode" disabled data-mode="sentences"><span class="ico">🌊</span><b>Sentence Stream</b></button>
         <button class="mode" disabled data-mode="fixit"><span class="ico">🔧</span><b>Fix-It</b></button>
@@ -210,15 +210,31 @@
       </div>
       <p class="note" id="voiceNote" hidden>This device has no English voice, so words are read in its own voice.</p>
     </div>
+    <h3 id="lblOrder">Practice order</h3>
+    <div class="segc" role="radiogroup" aria-labelledby="lblOrder" id="segOrder">
+      <button type="button" role="radio" aria-checked="false" data-order="order">In order</button>
+      <button type="button" role="radio" aria-checked="false" data-order="random">Random</button>
+    </div>
     <h3 id="lblApp">Appearance</h3>
     <div class="segc" role="radiogroup" aria-labelledby="lblApp" id="segApp">
       <button type="button" role="radio" aria-checked="false" data-theme-mode="light">Light</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="dark">Dark</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="auto">Automatic</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="c43c05eecb">1.03-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="22c70b6f8d">1.03-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
+  </div>
+</div>
+<!-- SPELLING BEE: how long (user's request, 2026-10-28) -->
+<div class="sheet" id="lenSheet" role="dialog" aria-modal="true" aria-labelledby="lenTitle" hidden>
+  <div class="sheet-card" id="lenCard" tabindex="-1">
+    <h2 id="lenTitle">🐝 Spelling Bee</h2>
+    <div class="len-choices" id="lenChoices">
+      <button type="button" class="primary" data-length="short"></button>
+      <button type="button" class="primary" data-length="long"></button>
+    </div>
+    <button type="button" class="sheet-done" id="lenCancel">Cancel</button>
   </div>
 </div>
 <!-- WORDS TO PRACTISE (over the stats on the welcome screen) -->
@@ -232,8 +248,8 @@
     <button type="button" class="sheet-done" id="missedDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=c43c05eecb"></script>
-<script src="data.js?v=c43c05eecb"></script>
-<script src="app.js?v=c43c05eecb"></script>
+<script src="words.js?v=22c70b6f8d"></script>
+<script src="data.js?v=22c70b6f8d"></script>
+<script src="app.js?v=22c70b6f8d"></script>
 </body>
 </html>

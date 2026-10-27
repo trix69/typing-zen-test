@@ -13,7 +13,8 @@
   let practiceDay = ""; // the day being practised, as Date.toDateString()
   // Timed games: Spelling Bee is a 20-minute session with as many words as Luke can manage.
   // Words come in batches of ROUND.spell, and none repeats within a session.
-  const MINUTES = { spell: 2 }; // test build only (live: 20)
+  // Spelling Bee lengths (user's request, 2026-10-28): one card, then a choice of 10 or 20 minutes.
+  const LENGTHS = { short: 1, long: 2 }; // test build only (live: { short: 10, long: 20 })
   // The time bar flashes red for the last 2.5% of a session: 30 s of 20 minutes, 3 s of 2 (the test build).
   const ENDING = 0.025;
   // When time runs out mid-word, Luke gets up to 10 s more to finish that word (user's request, 2026-10-26).
@@ -26,7 +27,7 @@
   // this version it becomes the first user (v1 itself is left as it was).
   const KEY = "typingZen.v2-test";
   const OLD_KEY = "typingZen.v1-test";
-  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "au-female", practised: {} });
+  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "au-female", practised: {}, practiseOrder: "order", learned: {}, streak: {} });
   // Names start with a capital letter. A blank name stays blank: the welcome form asks for one.
   const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : ""; };
   const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -399,8 +400,9 @@
   // Picks n items, preferring the ones practised longest ago (never-seen first), so rounds rotate
   // through the whole level before repeating. profile.seen maps item key -> pick counter.
   let seenTick = 0; // set for each user in useProfile()
-  function freshPick(list, n, key) {
-    const picked = shuffle(list).sort((a, b) => (profile.seen[key(a)] || 0) - (profile.seen[key(b)] || 0)).slice(0, n);
+  // rank (optional) goes first: a lower rank is picked sooner, whatever was seen when.
+  function freshPick(list, n, key, rank = () => 0) {
+    const picked = shuffle(list).sort((a, b) => rank(a) - rank(b) || (profile.seen[key(a)] || 0) - (profile.seen[key(b)] || 0)).slice(0, n);
     seenTick++;
     for (const it of picked) profile.seen[key(it)] = seenTick;
     save();
@@ -436,13 +438,36 @@
       case "words":
         return freshPick(pool, n, byWord).map((w) => ({ ...w, target: w.word }));
       case "spell": {
-        // Each batch: up to 3 tricky words from this level come back for another go; the rest are fresh
-        // words. Words already in this session are left out, so nothing repeats in 20 minutes.
-        const used = new Set(game && game.mode === "spell" ? game.items.map((it) => it.word) : []);
-        const left = pool.filter((w) => !used.has(w.word));
-        const tricky = pickN(left.filter((w) => profile.tricky[w.word]), 3);
-        const fresh = freshPick(left.filter((w) => !tricky.includes(w)), n - tricky.length, byWord);
-        return shuffle([...tricky, ...fresh]).map((w) => ({ ...w, target: w.word, hidden: true }));
+        // Each batch (a "round" of 10): up to 3 words come back for another go, then Word Garden words, then
+        // fresh ones. Words already in this session are left out, except the retries.
+        const playing = game && game.mode === "spell";
+        const round = playing ? game.batch + 1 : 0;
+        const missedIn = playing ? game.missedIn : {};
+        const used = new Set(playing ? game.items.map((it) => it.word) : []);
+        // Twice right first try in a row today: not picked again today, unless the level runs out of other
+        // words, and then only as many as the round needs (user's request, 2026-10-28).
+        const clean = beeToday().clean;
+        const doneToday = (w) => (clean[w.word] || 0) >= 2;
+        let left = pool.filter((w) => !used.has(w.word) && !doneToday(w));
+        const spare = pool.filter((w) => !used.has(w.word) && doneToday(w));
+        // Missed today (in this session or an earlier one): back in a later round, but not the very next one
+        // after the miss (user's request, 2026-10-28).
+        const missedToday = new Set([...(missedByDay(profile)[new Date().toDateString()] || []), ...Object.keys(missedIn)]);
+        const retry = pickN(pool.filter((w) => missedToday.has(w.word) && !doneToday(w) && missedIn[w.word] !== round - 1), 3);
+        left = left.filter((w) => !retry.includes(w));
+        const tricky = [...retry, ...pickN(left.filter((w) => profile.tricky[w.word]), 3 - retry.length)];
+        // Words learned in Word Garden in the last 7 days come next, before fresh ones (user's request,
+        // 2026-10-28). A word leaves profile.learned once it has been spelled here.
+        const week = Date.now() - 7 * 864e5;
+        const learned = shuffle(left.filter((w) => !tricky.includes(w) && Date.parse(profile.learned[w.word]) >= week))
+          .slice(0, n - tricky.length);
+        // A word right first try in several Spelling Bees in a row waits longer (user's request, 2026-10-28):
+        // words are taken by their run of right-first-try spellings, shortest first, then the usual rotation.
+        const fresh = freshPick(left.filter((w) => !tricky.includes(w) && !learned.includes(w)), n - tricky.length - learned.length,
+          byWord, (w) => profile.streak[w.word] || 0);
+        const short = n - tricky.length - learned.length - fresh.length;
+        const topUp = short > 0 ? freshPick(spare, short, byWord, (w) => profile.streak[w.word] || 0) : [];
+        return shuffle([...tricky, ...learned, ...fresh, ...topUp]).map((w) => ({ ...w, target: w.word, hidden: true }));
       }
       case "tricky": {
         const tricky = allWords().filter((w) => profile.tricky[w.word]);
@@ -454,9 +479,16 @@
         return freshPick(FIXITS, n, (f) => "f:" + f.right).map((f) => ({ ...f, target: f.right, hidden: true, open: true }));
       case "practise": {
         // Shown, not hidden: he copies each word, as many goes as it takes to get 5 clean ones.
+        // Progress is kept (user's request, 2026-10-28): each word starts from its saved clean goes, and words
+        // already done are left out. When every word is done, the whole day runs again from 0.
         const known = new Map(allWords().map((w) => [w.word, w]));
-        return (missedByDay(profile)[practiceDay] || []).map((word) =>
-          ({ word, meaning: "", sentence: "", why: "", ...known.get(word), target: word, reps: 0 }));
+        const words = missedByDay(profile)[practiceDay] || [];
+        const saved = practisedOn(profile, practiceDay);
+        const left = words.filter((w) => (saved[w] || 0) < PRACTISE_REPS);
+        const list = (left.length ? left : words).map((word) =>
+          ({ word, meaning: "", sentence: "", why: "", ...known.get(word), target: word, reps: left.length ? saved[word] || 0 : 0 }));
+        return profile.practiseOrder === "random" ? shuffle(list) : list; // Settings > Practice order
+
       }
     }
   }
@@ -464,13 +496,15 @@
   // ---------- Game state ----------
   let game = null;
 
-  function start(mode) {
+  // length: "short" or "long" for Spelling Bee (its card's data-length); kept for Play again.
+  function start(mode, length) {
     game = null; // a new session must not see the last one's words as used
     loadSwitch(currentSwitch()); // fetch the key sounds now (a click), so the first key isn't silent
     const items = buildItems(mode);
     if (!items.length) return;
-    game = { mode, items, idx: 0, correct: 0, errors: 0, ms: 0, missed: new Set(), firstTry: [], struggled: [], over: false };
-    if (MINUTES[mode]) game.endsAt = Date.now() + MINUTES[mode] * 60000;
+    game = { mode, length, items, batch: 0, missedIn: {}, idx: 0, correct: 0, errors: 0, ms: 0, missed: new Set(), firstTry: [], struggled: [], over: false };
+    game.minutes = mode === "spell" ? LENGTHS[length] || LENGTHS.long : 0;
+    if (game.minutes) game.endsAt = Date.now() + game.minutes * 60000;
     $("#modeTitle").textContent = TITLES[mode];
     $("#trail").innerHTML = game.endsAt ? '<i class="time"><b></b></i>' : items.map(() => "<i></i>").join("");
     $("#clock").hidden = !game.endsAt;
@@ -490,7 +524,7 @@
     clock.classList.toggle("low", secs <= 60);
     clock.classList.toggle("paused", !!game.pausedAt);
     // The bar fills from the left as time passes, and flashes red near the end.
-    const total = MINUTES[game.mode] * 60000;
+    const total = game.minutes * 60000;
     const bar = $("#trail .time b");
     if (bar) {
       bar.style.width = ((total - left) / total) * 100 + "%";
@@ -584,6 +618,10 @@
 
   // Practice's five dots, filled for each clean go.
   const repsDots = (it) => Array.from({ length: PRACTISE_REPS }, (_, i) => `<i class="${i < it.reps ? "on" : ""}"></i>`).join("");
+  function showReps(it) {
+    const box = $("#card .reps");
+    if (box) { box.innerHTML = repsDots(it); box.setAttribute("aria-label", `${it.reps} of ${PRACTISE_REPS} done`); }
+  }
 
   function renderLine() {
     const it = game.items[game.idx];
@@ -673,6 +711,8 @@
       line.classList.remove("shake"); void line.offsetWidth; line.classList.add("shake");
       if (k) { k.classList.add("miss"); setTimeout(() => k.classList.remove("miss"), 200); }
       if (it.hidden && game.revealed) $("#msg").textContent = "Here's a hint: type the orange letter.";
+      // Practice: any wrong key starts this word's 5 again, here and in the saved count (user's request, 2026-10-28).
+      if (game.mode === "practise") { it.reps = 0; showReps(it); savePractice(practiceDay, it.word, 0, true); }
     }
     renderLine();
   }
@@ -687,14 +727,35 @@
 
     // Timed games count each word: right first try (no wrong key at all), or needed another try.
     if (game.endsAt) (game.itemErr > 0 ? game.struggled : game.firstTry).push(it.word);
+    // Word Garden is the learning mode: the words typed there wait for Spelling Bee (7 days at most).
+    if (game.mode === "words") {
+      profile.learned[it.word] = new Date().toISOString();
+      const week = Date.now() - 7 * 864e5;
+      for (const w of Object.keys(profile.learned)) if (!(Date.parse(profile.learned[w]) >= week)) delete profile.learned[w];
+    }
+    if (game.mode === "spell") {
+      delete profile.learned[it.word]; // spelled from memory: no longer waiting
+      // The run of right-first-try spellings: one more, or back to 0 after a miss.
+      if (game.itemErr) delete profile.streak[it.word];
+      else profile.streak[it.word] = (profile.streak[it.word] || 0) + 1;
+      const today = new Date().toDateString(), day = beeToday();
+      if (game.itemErr) {
+        game.missedIn[it.word] = game.batch; // its round, so it skips the next one
+        delete day.clean[it.word]; // a miss in between: the two right-first-try spellings start again
+      }
+      else {
+        // Spelled right after being missed today: that counts as one of its 5 Practice goes (user's request).
+        const missedEarlier = (missedByDay(profile)[today] || []).includes(it.word) || game.struggled.includes(it.word);
+        if (missedEarlier) savePractice(today, it.word, (practisedOn(profile, today)[it.word] || 0) + 1);
+        day.clean[it.word] = (day.clean[it.word] || 0) + 1;
+      }
+    }
 
     // Practice counts the clean goes; copying a word doesn't change the tricky words.
     if (game.mode === "practise" && !game.itemErr) {
       it.reps++;
-      // Fill the dot now, with the message, not on the next go (so the fifth one shows too; Hermes R20.2).
-      const box = $("#card .reps");
-      if (box) { box.innerHTML = repsDots(it); box.setAttribute("aria-label", `${it.reps} of ${PRACTISE_REPS} done`); }
-      if (it.reps === PRACTISE_REPS) markPractised(practiceDay, it.word);
+      showReps(it); // fill the dot now, with the message, not on the next go (so the fifth one shows too; Hermes R20.2)
+      savePractice(practiceDay, it.word, it.reps); // every clean go is kept, not just the fifth
     }
     if (it.word && game.mode !== "sentences" && game.mode !== "practise") {
       if (game.itemErr > 0) {
@@ -702,8 +763,8 @@
         game.missed.add(it.word);
         // Missed again after practising it today: it needs practice again, so its green tick comes off
         // (Hermes R23.1). A tick on an earlier day's list stays.
-        const done = profile.practised[new Date().toDateString()];
-        if (done && done.includes(it.word)) done.splice(done.indexOf(it.word), 1);
+        const today = new Date().toDateString(), done = practisedOn(profile, today);
+        if (done[it.word]) { delete done[it.word]; profile.practised[today] = done; }
       } else if (profile.tricky[it.word] && (game.mode === "spell" || game.mode === "tricky")) {
         // Spelling it cleanly from memory earns the word its way off the list.
         if (--profile.tricky[it.word] <= 0) delete profile.tricky[it.word];
@@ -719,7 +780,7 @@
       game.wait = "enter";
     } else if (game.mode === "practise") {
       msg.className = "msg good";
-      msg.textContent = game.itemErr ? "That one had a slip, so it doesn't count. Type it again."
+      msg.textContent = game.itemErr ? "A slip starts the count again. Type it again."
         : it.reps < PRACTISE_REPS ? `✓ ${it.reps} of ${PRACTISE_REPS}. ${praise}` : `✓ ${it.word}: all ${PRACTISE_REPS} done! ${praise}`;
       setTimeout(next, game.itemErr ? 1200 : 700);
     } else {
@@ -738,7 +799,7 @@
     if (game.mode === "practise" && game.items[game.idx].reps < PRACTISE_REPS) return loadItem(); // the same word again
     game.idx++;
     // A timed game never runs out of words: add another batch (if the level has any left).
-    if (game.endsAt && game.idx >= game.items.length) game.items.push(...buildItems(game.mode));
+    if (game.endsAt && game.idx >= game.items.length) { game.items.push(...buildItems(game.mode)); game.batch++; }
     if (game.idx >= game.items.length) finish();
     else loadItem();
   }
@@ -748,10 +809,10 @@
     if (!game || !game.endsAt || game.saved) return;
     game.saved = true;
     const now = game.pausedAt || Date.now(); // leaving from the paused question: the pause isn't counted
-    const minutes = Math.round((Math.min(now, game.endsAt) - (game.endsAt - MINUTES[game.mode] * 60000)) / 60000);
+    const minutes = Math.round((Math.min(now, game.endsAt) - (game.endsAt - game.minutes * 60000)) / 60000);
     if (!finished && !game.firstTry.length && !game.struggled.length) return; // left before doing anything
     profile.sessions.push({
-      date: new Date().toISOString(), game: game.mode, level: currentBucket().name, minutes, finished,
+      date: new Date().toISOString(), game: game.mode, level: currentBucket().name, minutes, length: game.minutes, finished,
       firstTry: game.firstTry.length, struggled: game.struggled.length,
       firstTryWords: game.firstTry, struggledWords: game.struggled,
     });
@@ -776,8 +837,8 @@
     const speed = wpm(game.correct, game.ms);
     // No words done (a timed game where time ran out first) earns no stars and no round.
     const stars = !done ? 0 : acc >= 95 ? 3 : acc >= 85 ? 2 : 1;
-    // Best speed is for typing from memory: not Fix-It or Practice, where the text is on screen (Hermes R20.1).
-    const newBest = speed > profile.bestWpm && game.mode !== "fixit" && game.mode !== "practise";
+    // Best speed is for typing from memory: not Fix-It, Practice or Word Garden, where the text is on screen (Hermes R20.1).
+    const newBest = speed > profile.bestWpm && !["fixit", "practise", "words"].includes(game.mode); // Word Garden too: the word is shown
     if (done) {
       profile.stars += stars;
       profile.rounds++;
@@ -854,7 +915,7 @@
   document.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return; // typing a name on the welcome screen
     const playing = !$("#play").hidden;
-    if (!$("#results").hidden && e.key === "Enter") { e.preventDefault(); return start(game.mode); }
+    if (!$("#results").hidden && e.key === "Enter") { e.preventDefault(); return start(game.mode, game.length); }
     if (!$("#results").hidden && e.key === "Escape") return show("home");
     if (!playing || !game) return;
     if (e.key === "Escape") return leave();
@@ -897,14 +958,45 @@
   });
   document.querySelectorAll(".mode").forEach((b) => b.addEventListener("click", () => {
     b.blur();
+    if (b.dataset.mode === "spell") return openLength();
     if (b.dataset.mode === "practise") practiceDay = new Date().toDateString();
     start(b.dataset.mode);
   }));
+  // Spelling Bee asks how long first. The labels come from LENGTHS, so the test build's short sessions show.
+  const lenSheet = $("#lenSheet");
+  for (const b of $("#lenChoices").children) {
+    const m = LENGTHS[b.dataset.length];
+    b.textContent = `${m} minute${m === 1 ? "" : "s"}`;
+  }
+  function openLength() {
+    lenSheet.hidden = false;
+    document.addEventListener("keydown", onLengthKey);
+    $("#lenChoices button").focus();
+  }
+  function closeLength() {
+    lenSheet.hidden = true;
+    document.removeEventListener("keydown", onLengthKey);
+  }
+  // Esc closes it, and Tab stays inside it (as in Settings).
+  function onLengthKey(e) {
+    if (e.key === "Escape") { e.preventDefault(); closeLength(); return $('.mode[data-mode="spell"]').focus(); }
+    if (e.key !== "Tab") return;
+    const items = [...lenSheet.querySelectorAll("button")];
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === $("#lenCard"))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+  $("#lenChoices").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-length]");
+    if (b) { closeLength(); start("spell", b.dataset.length); }
+  });
+  $("#lenCancel").addEventListener("click", () => { closeLength(); $('.mode[data-mode="spell"]').focus(); });
+  lenSheet.addEventListener("click", (e) => { if (e.target === lenSheet) closeLength(); });
   $("#clearBtn").addEventListener("click", () => { $("#clearBtn").hidden = true; $("#clearConfirm").hidden = false; });
   $("#clearNo").addEventListener("click", renderHome);
   $("#clearYes").addEventListener("click", () => {
     // Keeps the name, level, mute, key sound and voice; wipes scores, tricky words and the session history.
-    Object.assign(profile, { bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], practised: {} });
+    Object.assign(profile, { bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], practised: {}, learned: {}, streak: {}, beeToday: null });
     save();
     renderHome();
   });
@@ -918,6 +1010,7 @@
     for (const b of $("#segApp").children) b.setAttribute("aria-checked", String(b.dataset.themeMode === THEME.mode));
     for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
     for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (currentSwitch() || "off")));
+    for (const b of $("#segOrder").children) b.setAttribute("aria-checked", String(b.dataset.order === (profile.practiseOrder === "random" ? "random" : "order")));
   }
   function openSheet() {
     syncSheet();
@@ -962,6 +1055,11 @@
   });
   $("#sheetDone").addEventListener("click", closeSheet);
   sheet.addEventListener("click", (e) => { if (e.target === sheet) closeSheet(); });
+  // Practice order (user's request, 2026-10-28): the day's words in the order they were missed, or shuffled.
+  $("#segOrder").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (b) { profile.practiseOrder = b.dataset.order; save(); syncSheet(); }
+  });
   $("#segApp").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (b) { THEME.set(b.dataset.themeMode); syncSheet(); }
@@ -1034,7 +1132,7 @@
 
   $("#backBtn").addEventListener("click", () => show("home"));
   $("#homeBtn").addEventListener("click", () => show("home"));
-  $("#againBtn").addEventListener("click", () => start(game.mode));
+  $("#againBtn").addEventListener("click", () => start(game.mode, game.length));
   $("#muteBtn").addEventListener("click", (e) => {
     profile.mute = !profile.mute; save();
     showSoundIcon();
@@ -1084,15 +1182,29 @@
     return Object.fromEntries(Object.entries(days).filter(([, l]) => l.length)
       .sort(([a], [b]) => new Date(b) - new Date(a)));
   }
-  // Words practised all 5 times stay in Words to practise, shown in green (user's request, 2026-10-27).
-  // profile.practised maps a day (as in missedByDay) to its practised words; days older than 7 are dropped.
-  function markPractised(day, word) {
-    const list = profile.practised[day] || (profile.practised[day] = []);
-    if (!list.includes(word)) list.push(word);
+  // Spelling Bee today: { day, clean: { word: times right first try today } }; starts again each new day.
+  function beeToday() {
+    const day = new Date().toDateString();
+    if (!profile.beeToday || profile.beeToday.day !== day) profile.beeToday = { day, clean: {} };
+    return profile.beeToday;
+  }
+  // Practice progress: profile.practised maps a day (as in missedByDay) to { word: clean goes so far }. A word
+  // with all 5 stays in Words to practise, shown in green (user's request, 2026-10-27); fewer show as "2/5".
+  // Days older than 7 are dropped. Builds from before 2026-10-28 saved a list of finished words instead.
+  function practisedOn(u, day) {
+    const v = (u.practised || {})[day];
+    return Array.isArray(v) ? Object.fromEntries(v.map((w) => [w, PRACTISE_REPS])) : { ...v };
+  }
+  // exact: set the count as given (a slip sets it to 0); otherwise it only goes up.
+  function savePractice(day, word, reps, exact = false) {
+    const d = practisedOn(profile, day);
+    d[word] = exact ? reps : Math.max(d[word] || 0, reps);
+    if (!d[word]) delete d[word];
+    profile.practised[day] = d;
     const from = new Date();
     from.setHours(0, 0, 0, 0);
     from.setDate(from.getDate() - 6);
-    for (const d of Object.keys(profile.practised)) if (!(new Date(d) >= from)) delete profile.practised[d];
+    for (const k of Object.keys(profile.practised)) if (!(new Date(k) >= from)) delete profile.practised[k];
     save();
   }
   const wordsAndRate = (t) =>
@@ -1230,11 +1342,13 @@
     $("#missedDays").innerHTML = Object.entries(missedByDay(u)).map(([day, words]) => {
       const name = day === today ? "Today" : day === yesterday ? "Yesterday"
         : new Date(day).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-      const done = (u.practised || {})[day] || [];
-      const count = words.filter((w) => done.includes(w)).length;
+      const reps = practisedOn(u, day);
+      const count = words.filter((w) => reps[w] >= PRACTISE_REPS).length;
       return `<section class="missed-day"><h3>${name} · ${words.length} word${words.length === 1 ? "" : "s"}${count ? ` · ${count} practised` : ""}</h3>
-        <div class="tricky-list">${words.map((w) => done.includes(w)
-          ? `<span class="done" title="Practised">✓ ${escapeHtml(w)}</span>` : `<span>${escapeHtml(w)}</span>`).join("")}</div>
+        <div class="tricky-list">${words.map((w) => reps[w] >= PRACTISE_REPS
+          ? `<span class="done" title="Practised">✓ ${escapeHtml(w)}</span>`
+          : reps[w] ? `<span title="${reps[w]} of ${PRACTISE_REPS} goes done">${escapeHtml(w)} <small>${reps[w]}/${PRACTISE_REPS}</small></span>`
+          : `<span>${escapeHtml(w)}</span>`).join("")}</div>
         <button type="button" class="primary small" data-day="${escapeHtml(day)}">${day === today ? "Practise today's " + (words.length === 1 ? "word" : "words")
           : words.length === 1 ? "Practise this word" : "Practise these words"}</button></section>`;
     }).join("") || `<p class="note">No words to practise from the last 7 days.</p>`;
