@@ -182,7 +182,7 @@
   // ---------- Sound ----------
   let audio;
   function tone(freq, dur = 0.08, type = "sine", vol = 0.05) {
-    if (profile.mute) return;
+    if (muted()) return;
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       const o = audio.createOscillator(), g = audio.createGain();
@@ -228,7 +228,7 @@
   // Plays the press (or release) recording for an on-screen key id ("a", " ", "shift-l", "escape"…).
   function keySound(id, phase = "press") {
     const sw = currentSwitch();
-    if (profile.mute || !sw) return;
+    if (muted() || !sw) return;
     loadSwitch(sw);
     const bufs = loaded[sw] && loaded[sw].bufs;
     const name = SPECIAL[id] && SWITCHES[sw] ? `${phase}/${SPECIAL[id]}`
@@ -324,19 +324,24 @@
   // else a British woman (Chrome on Windows, Hermes R19.2), else the first woman listed, else the first entry.
   function chosenVoice(cs = voiceChoices()) {
     const want = OLD_VOICE[profile.voice] || profile.voice;
-    const kept = !cs.some((c) => c.id === want) && englishVoices().find((v) => v.voiceURI === want);
-    return cs.find((c) => c.id === want) || (kept ? extraVoice(kept) : null) || cs.find((c) => c.id === "au-female") ||
+    // A voice saved by its voiceURI (earlier builds) that is already one of the three is that entry, not a 4th.
+    const kept = !cs.some((c) => c.id === want || c.voice.voiceURI === want) && englishVoices().find((v) => v.voiceURI === want);
+    return cs.find((c) => c.id === want || c.voice.voiceURI === want) || (kept ? extraVoice(kept) : null) || cs.find((c) => c.id === "au-female") ||
       cs.find((c) => c.kind === "female" && langOf(c.voice) === "en-GB") || cs.find((c) => c.kind === "female") || cs[0] || null;
   }
   function pickVoice() {
     const c = chosenVoice();
     return c ? c.voice : null;
   }
+  // Sound is always on in Spelling Bee (it is spoken, and its mute button is hidden) and while Settings is open
+  // (to try voices and key sounds). profile.mute itself is left as it was, so it applies again everywhere else
+  // (user's request, 2026-10-28).
+  const muted = () => profile.mute && !(game && game.mode === "spell" && !$("#play").hidden) && $("#sheet").hidden;
   let speechRun = 0;
   let speakTimer = 0; // the short wait before a new item is spoken; cleared by stopSpeech()
   function speak(...texts) {
     const run = ++speechRun;
-    if (profile.mute || !("speechSynthesis" in window)) return;
+    if (muted() || !("speechSynthesis" in window)) return;
     speechSynthesis.cancel();
     const say = (i) => {
       if (run !== speechRun || i >= texts.length) return;
@@ -508,7 +513,12 @@
     $("#modeTitle").textContent = TITLES[mode];
     $("#trail").innerHTML = game.endsAt ? '<i class="time"><b></b></i>' : items.map(() => "<i></i>").join("");
     $("#clock").hidden = !game.endsAt;
+    $("#muteBtn").hidden = mode === "spell";
     show("play");
+    // Phones and tablets type on their own keyboard by default (user's request, like TypingClub). This runs
+    // inside the tap that started the game, which iOS needs before it will show the keyboard.
+    $("#kbdToggle").hidden = !TOUCH;
+    deviceKeyboard(TOUCH);
     tickClock();
     loadItem();
   }
@@ -569,7 +579,7 @@
   function loadItem() {
     const it = game.items[game.idx];
     resumeClock(); // a safety net: next() no longer loads a word while "Leave this round?" is up
-    Object.assign(game, { typed: "", posErr: 0, revealed: false, itemErr: 0, itemStart: null, wait: false, leaving: null });
+    Object.assign(game, { typed: "", posErr: 0, revealed: false, itemErr: 0, errAt: new Set(), hinted: false, itemStart: null, wait: false, leaving: null });
     $("#msg").className = "msg";
     $("#msg").innerHTML = "";
     $("#line").className = "line" + (it.target.length > 24 ? " small" : "");
@@ -704,15 +714,17 @@
     } else {
       game.errors++;
       game.itemErr++;
+      game.errAt.add(game.typed.length); // which letters had a wrong key
       game.posErr++;
-      if (game.posErr >= 2) game.revealed = true;
+      if (game.posErr >= 2) game.revealed = game.hinted = true; // the orange hint letter shows
       sfx.miss();
       const line = $("#line");
       line.classList.remove("shake"); void line.offsetWidth; line.classList.add("shake");
       if (k) { k.classList.add("miss"); setTimeout(() => k.classList.remove("miss"), 200); }
       if (it.hidden && game.revealed) $("#msg").textContent = "Here's a hint: type the orange letter.";
-      // Practice: any wrong key starts this word's 5 again, here and in the saved count (user's request, 2026-10-28).
-      if (game.mode === "practise") { it.reps = 0; showReps(it); savePractice(practiceDay, it.word, 0, true); }
+      // Practice: a real slip starts this word's 5 again, here and in the saved count (user's request,
+      // 2026-10-28). One typo put right before the hint is forgiven, as in Spelling Bee.
+      if (game.mode === "practise" && (game.errAt.size > 1 || game.hinted)) { it.reps = 0; showReps(it); savePractice(practiceDay, it.word, 0, true); }
     }
     renderLine();
   }
@@ -726,7 +738,10 @@
     sfx.chime();
 
     // Timed games count each word: right first try (no wrong key at all), or needed another try.
-    if (game.endsAt) (game.itemErr > 0 ? game.struggled : game.firstTry).push(it.word);
+    // One typo, put right before the orange hint showed, still counts as right first try (user's request,
+    // 2026-10-28), in Practice too; wrong keys on two letters, or a hint, don't.
+    const missed = game.itemErr > 0 && (game.errAt.size > 1 || game.hinted);
+    if (game.endsAt) (missed ? game.struggled : game.firstTry).push(it.word);
     // Word Garden is the learning mode: the words typed there wait for Spelling Bee (7 days at most).
     if (game.mode === "words") {
       profile.learned[it.word] = new Date().toISOString();
@@ -736,10 +751,10 @@
     if (game.mode === "spell") {
       delete profile.learned[it.word]; // spelled from memory: no longer waiting
       // The run of right-first-try spellings: one more, or back to 0 after a miss.
-      if (game.itemErr) delete profile.streak[it.word];
+      if (missed) delete profile.streak[it.word];
       else profile.streak[it.word] = (profile.streak[it.word] || 0) + 1;
       const today = new Date().toDateString(), day = beeToday();
-      if (game.itemErr) {
+      if (missed) {
         game.missedIn[it.word] = game.batch; // its round, so it skips the next one
         delete day.clean[it.word]; // a miss in between: the two right-first-try spellings start again
       }
@@ -752,13 +767,13 @@
     }
 
     // Practice counts the clean goes; copying a word doesn't change the tricky words.
-    if (game.mode === "practise" && !game.itemErr) {
+    if (game.mode === "practise" && !missed) {
       it.reps++;
       showReps(it); // fill the dot now, with the message, not on the next go (so the fifth one shows too; Hermes R20.2)
       savePractice(practiceDay, it.word, it.reps); // every clean go is kept, not just the fifth
     }
     if (it.word && game.mode !== "sentences" && game.mode !== "practise") {
-      if (game.itemErr > 0) {
+      if (missed) {
         profile.tricky[it.word] = (profile.tricky[it.word] || 0) + 1;
         game.missed.add(it.word);
         // Missed again after practising it today: it needs practice again, so its green tick comes off
@@ -773,16 +788,16 @@
     }
 
     const msg = $("#msg");
-    const praise = game.itemErr === 0 ? PRAISE[Math.floor(Math.random() * PRAISE.length)] : "Done. Keep going!";
+    const praise = !missed ? PRAISE[Math.floor(Math.random() * PRAISE.length)] : "Done. Keep going!";
     if (game.mode === "fixit") {
       msg.className = "msg good";
       msg.innerHTML = `✓ Fixed it! <span class="rule">${escapeHtml(it.rule)}</span><span class="rule">Press <kbd>Enter</kbd> for the next one.</span>`;
       game.wait = "enter";
     } else if (game.mode === "practise") {
       msg.className = "msg good";
-      msg.textContent = game.itemErr ? "A slip starts the count again. Type it again."
+      msg.textContent = missed ? "A slip starts the count again. Type it again."
         : it.reps < PRACTISE_REPS ? `✓ ${it.reps} of ${PRACTISE_REPS}. ${praise}` : `✓ ${it.word}: all ${PRACTISE_REPS} done! ${praise}`;
-      setTimeout(next, game.itemErr ? 1200 : 700);
+      setTimeout(next, missed ? 1200 : 700);
     } else {
       msg.className = "msg good";
       msg.innerHTML = escapeHtml((it.hidden ? `✓ ${it.word}. ` : "✓ ") + praise) +
@@ -865,6 +880,7 @@
 
   // ---------- Screens ----------
   function show(id) {
+    if (id !== "play") $("#typer").blur(); // the device keyboard goes away with the game
     for (const s of document.querySelectorAll(".screen")) s.hidden = s.id !== id;
     if (id === "home") renderHome();
   }
@@ -911,9 +927,45 @@
     b.title = profile.mute ? "Sound off" : "Sound on";
   }
 
+  // ---------- Device keyboard (touch screens) ----------
+  // A hidden text box (#typer) has the focus, so the device's own keyboard is up and our on-screen one is
+  // hidden. iOS sends real keydown events, which the game handler below takes (and stops them reaching the
+  // box). Android sends "Unidentified" keys, so the letter arrives in the box instead: each one is passed on as
+  // a keydown, like a tap on the on-screen keyboard. The button switches between the two keyboards.
+  const TOUCH = window.matchMedia ? matchMedia("(pointer: coarse)").matches : false;
+  const typer = $("#typer");
+  function deviceKeyboard(on) {
+    $("#play").classList.toggle("native", on);
+    const b = $("#kbdToggle");
+    b.setAttribute("aria-label", on ? "Use the on-screen keyboard" : "Use the device keyboard");
+    b.title = b.getAttribute("aria-label");
+    if (on) typer.focus({ preventScroll: true });
+    else typer.blur();
+  }
+  typer.addEventListener("input", () => {
+    const text = typer.value;
+    typer.value = "";
+    for (const key of text) {
+      const ev = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      ev.fromScreen = true;
+      document.dispatchEvent(ev);
+    }
+  });
+  // Closing the device keyboard (its own button, or a tap elsewhere) brings the on-screen one back.
+  typer.addEventListener("blur", () => { if (!$("#play").hidden) deviceKeyboard(false); });
+  // The button must not take the focus itself, or the keyboard would close before the tap is read.
+  $("#kbdToggle").addEventListener("pointerdown", (e) => e.preventDefault());
+  // Nor may "Hear the word" or the speaker button while the device keyboard is up.
+  $("#play").addEventListener("pointerdown", (e) => {
+    if ($("#play").classList.contains("native") && e.target.closest("#card button, #muteBtn")) e.preventDefault();
+  });
+  // Tapping the word (like tapping a text box) brings the device keyboard up.
+  $("#play .stage").addEventListener("click", (e) => { if (TOUCH && !e.target.closest("button")) deviceKeyboard(true); });
+  $("#kbdToggle").addEventListener("click", () => deviceKeyboard(!$("#play").classList.contains("native")));
+
   // ---------- Events ----------
   document.addEventListener("keydown", (e) => {
-    if (e.target.tagName === "INPUT") return; // typing a name on the welcome screen
+    if (e.target.id === "newName") return; // typing a name on the welcome screen
     const playing = !$("#play").hidden;
     if (!$("#results").hidden && e.key === "Enter") { e.preventDefault(); return start(game.mode, game.length); }
     if (!$("#results").hidden && e.key === "Escape") return show("home");
@@ -934,7 +986,8 @@
     if (game.wait || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key.length !== 1) return;
     e.preventDefault(); // stops space scrolling and quick-find on ' and /
-    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+    const f = document.activeElement;
+    if (f && f !== document.body && f !== typer) f.blur(); // the typing box keeps the focus: it holds the device keyboard up
     press(e.key);
   });
 
@@ -1092,7 +1145,7 @@
   function fillVoices() {
     const cs = voiceChoices();
     const c = chosenVoice(cs);
-    if (c && !cs.includes(c) && !cs.some((x) => x.id === c.id)) cs.push(c); // a saved voice outside the three stays listed
+    if (c && !cs.includes(c) && !cs.some((x) => x.id === c.id || x.voice === c.voice)) cs.push(c); // a saved voice outside the three stays listed
     $("#voiceSel").innerHTML = cs.map((c) => {
       const about = [c.accent, c.kind].filter(Boolean).join(", ");
       // "Microsoft Ryan Online (Natural) - English (United Kingdom)" → "Ryan"

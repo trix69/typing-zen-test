@@ -359,6 +359,13 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .msg .rule { display: block; font-weight: 600; color: var(--fg); margin-top: 4px; }
 
 .finger { text-align: center; color: var(--muted); font-weight: 700; min-height: 1.5em; }
+/* Device keyboard (touch screens): the typing box is invisible, our keyboard and finger hint step aside. */
+.stage { position: relative; }
+.typer { position: absolute; left: 50%; bottom: 8px; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; font-size: 16px; caret-color: transparent; }
+#play.native .kbd, #play.native .finger { display: none; }
+.kbd-toggle { align-self: center; display: grid; place-items: center; width: 56px; height: 40px; padding: 0; border-radius: 12px; background: var(--fg); color: var(--bg); border: 0; }
+.kbd-toggle svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+#play.native .kbd-toggle { background: var(--panel); color: var(--fg); border: 1px solid var(--line); }
 
 /* On-screen keyboard */
 .kbd { --u: min(52px, calc((100vw - 32px) / 15)); --kh: 46px; display: flex; flex-direction: column; gap: 6px; align-items: center; user-select: none; }

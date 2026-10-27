@@ -36,7 +36,7 @@
   window.THEME.apply();
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=22c70b6f8d">
+<link rel="stylesheet" href="style.css?v=1e8c625ffc">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -165,10 +165,13 @@
       <div class="card" id="card"></div>
       <div class="line" id="line"></div>
       <div class="msg" id="msg" aria-live="polite"></div>
+      <!-- Touch screens type through this hidden box, which brings up the device's own keyboard. -->
+      <input class="typer" id="typer" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" aria-label="Type here">
     </div>
 
     <div class="finger" id="finger"></div>
     <div class="kbd" id="kbd" aria-hidden="true"></div>
+    <button type="button" class="kbd-toggle" id="kbdToggle" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M6 10h1M10 10h1M14 10h1M18 10h1M6 13.5h1M10 13.5h1M14 13.5h1M18 13.5h1M8 16.5h8"/></svg></button>
   </section>
 
   <!-- RESULTS -->
@@ -221,7 +224,7 @@
       <button type="button" role="radio" aria-checked="false" data-theme-mode="dark">Dark</button>
       <button type="button" role="radio" aria-checked="false" data-theme-mode="auto">Automatic</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="22c70b6f8d">1.03-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="1e8c625ffc">1.03-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -248,8 +251,8 @@
     <button type="button" class="sheet-done" id="missedDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=22c70b6f8d"></script>
-<script src="data.js?v=22c70b6f8d"></script>
-<script src="app.js?v=22c70b6f8d"></script>
+<script src="words.js?v=1e8c625ffc"></script>
+<script src="data.js?v=1e8c625ffc"></script>
+<script src="app.js?v=1e8c625ffc"></script>
 </body>
 </html>
