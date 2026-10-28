@@ -230,9 +230,17 @@
   }
 
   // ---------- Sound ----------
+  // iPhones and iPads on silent (the ring/silent switch) mute a web page's sound, in Safari and Chrome alike
+  // (user's report, 2026-10-29). iOS 16.4 and later let a page play like a music app instead, which the switch
+  // doesn't mute. Asked for just before the first sound, so opening the page doesn't stop other music.
+  // The app's own speaker button still turns sound off.
+  function playThroughSilent() {
+    try { if (navigator.audioSession && navigator.audioSession.type !== "playback") navigator.audioSession.type = "playback"; } catch { /* not supported */ }
+  }
   let audio;
   function tone(freq, dur = 0.08, type = "sine", vol = 0.05) {
     if (muted()) return;
+    playThroughSilent();
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       const o = audio.createOscillator(), g = audio.createGain();
@@ -277,6 +285,7 @@
   function keySound(id, phase = "press") {
     const sw = currentSwitch();
     if (muted() || !sw) return;
+    playThroughSilent();
     loadSwitch(sw);
     const bufs = loaded[sw] && loaded[sw].bufs;
     const name = SPECIAL[id] && SWITCHES[sw] ? `${phase}/${SPECIAL[id]}`
@@ -403,6 +412,7 @@
   function speak(...texts) {
     const run = ++speechRun;
     if (muted() || !("speechSynthesis" in window)) return;
+    playThroughSilent();
     speechSynthesis.cancel();
     const say = (i) => {
       if (run !== speechRun || i >= texts.length) return;
@@ -1020,6 +1030,7 @@
   // hidden. iOS sends real keydown events, which the game handler below takes (and stops them reaching the
   // box). Android sends "Unidentified" keys, so the letter arrives in the box instead: each one is passed on as
   // a keydown, like a tap on the on-screen keyboard. The button switches between the two keyboards.
+  const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const TOUCH = window.matchMedia ? matchMedia("(pointer: coarse)").matches : false;
   // Tablets (shorter side 600px or more: every iPad) start with the on-screen keyboard, as they are often used
   // with an external or Bluetooth keyboard, which a web page can't detect (user's request, 2026-10-28).
@@ -1157,7 +1168,7 @@
   const howto = $("#howto");
   (() => {
     const ua = navigator.userAgent, standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-    const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const ios = IOS;
     $("#installRow").hidden = standalone || window.top !== window;
     const showDev = (d) => {
       for (const b of $("#segDev").children) b.setAttribute("aria-checked", String(b.dataset.dev === d));
@@ -1331,6 +1342,10 @@
     $("#voiceNote").textContent = tx("This device has no English voice, so words are read in its own voice.",
       "Denne enhed har ingen dansk stemme, så ordene læses op med enhedens egen stemme.");
     $("#voiceNote").hidden = cs.length > 0 || !("speechSynthesis" in window && speechSynthesis.getVoices().length);
+    // iPhone and iPad: before iOS 16.4 the silent switch still mutes the page.
+    $("#silentNote").hidden = !IOS;
+    $("#silentNote").textContent = tx("No sound? Check that the iPhone or iPad isn't on silent, and turn the volume up.",
+      "Ingen lyd? Tjek, at din iPhone eller iPad ikke er på lydløs, og skru op for lyden.");
     $("#voiceRow").hidden = !("speechSynthesis" in window);
   }
   if ("speechSynthesis" in window && speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged", fillVoices);
