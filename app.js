@@ -515,10 +515,11 @@
     $("#clock").hidden = !game.endsAt;
     $("#muteBtn").hidden = mode === "spell";
     show("play");
-    // Phones and tablets type on their own keyboard by default (user's request, like TypingClub). This runs
-    // inside the tap that started the game, which iOS needs before it will show the keyboard.
+    // Phones type on their own keyboard by default (user's request, like TypingClub); tablets show the
+    // on-screen one (see TABLET). This runs inside the tap that started the game, which iOS needs before it
+    // will show the keyboard.
     $("#kbdToggle").hidden = !TOUCH;
-    deviceKeyboard(TOUCH);
+    deviceKeyboard(TOUCH && !TABLET);
     tickClock();
     loadItem();
   }
@@ -931,6 +932,10 @@
   // box). Android sends "Unidentified" keys, so the letter arrives in the box instead: each one is passed on as
   // a keydown, like a tap on the on-screen keyboard. The button switches between the two keyboards.
   const TOUCH = window.matchMedia ? matchMedia("(pointer: coarse)").matches : false;
+  // Tablets (shorter side 600px or more: every iPad) start with the on-screen keyboard, as they are often used
+  // with an external or Bluetooth keyboard, which a web page can't detect (user's request, 2026-10-28).
+  // Phones start with their own keyboard. The button switches either way.
+  const TABLET = TOUCH && Math.min(screen.width, screen.height) >= 600;
   const typer = $("#typer");
   function deviceKeyboard(on) {
     $("#play").classList.toggle("native", on);
