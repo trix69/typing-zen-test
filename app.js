@@ -64,8 +64,9 @@
   // gives both languages to tx(); index.html's own text is swapped from DA_TEXT (data.js) by translatePage().
   // The language on screen: the user's, except that a link ending #dk (or #da, #en) opens the start screens
   // in that language before anyone is chosen, and a new user made there starts in it (user's request: #dk).
+  // With no users yet, the start screens use the language last picked in Settings there (store.lang).
   const HASH_LANG = { "#dk": "da", "#da": "da", "#en": "en" }[location.hash.toLowerCase()] || null;
-  let shownLang = HASH_LANG || profile.lang;
+  let shownLang = HASH_LANG || (store.users[store.current] ? profile.lang : store.lang || "en");
   const DA = () => shownLang === "da";
   const tx = (en, da) => (DA() ? da : en);
 
@@ -1226,8 +1227,17 @@
   // Appearance is Light, Dark or Automatic. THEME (set up in index.html's <head>) saves it to
   // typingZen.theme, apart from the progress in typingZen.v2. Your year is the current user's school
   // year: it sets which three levels are open.
+  // Settings also opens from the welcome screen (user's request, 2026-10-29), before anyone is chosen: there
+  // the settings that belong to a user (year, key sound, voice, practice order, Switch user, Clear history)
+  // are greyed out, and Language only sets the language of the start screens and of new users.
   const sheet = $("#sheet");
   function syncSheet() {
+    const none = !chosen;
+    sheet.classList.toggle("no-user", none);
+    for (const el of sheet.querySelectorAll(".user-only button, .user-only select")) el.disabled = none;
+    $("#langNote").hidden = !none;
+    $("#langNote").textContent = tx("Sets the language of the start screens and of new users. Choose a user first to change their language.",
+      "Vælger sproget på startskærmene og for nye brugere. Vælg først en bruger for at skifte brugerens sprog.");
     fillVoices();
     for (const b of $("#segApp").children) b.setAttribute("aria-checked", String(b.dataset.themeMode === THEME.mode));
     for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
@@ -1236,6 +1246,8 @@
     showLang(null);
     for (const b of $("#segLang").children) b.setAttribute("aria-checked", String(b.dataset.lang === (DA() ? "da" : "en")));
     for (const b of $("#segOrder").children) b.setAttribute("aria-checked", String(b.dataset.order === (profile.practiseOrder === "random" ? "random" : "order")));
+    // No one chosen: no one's year, sound or order is shown as picked.
+    if (none) for (const b of sheet.querySelectorAll("#segYear button, #segSound button, #segOrder button")) b.setAttribute("aria-checked", "false");
   }
   function openSheet() {
     syncSheet();
@@ -1247,7 +1259,7 @@
   function closeSheet() {
     sheet.hidden = true;
     document.removeEventListener("keydown", onSheetKey);
-    $("#settingsBtn").focus();
+    $(chosen ? "#settingsBtn" : "#welcomeSettingsBtn").focus();
   }
   // Esc closes the sheet, and Tab stays inside it.
   function onSheetKey(e) {
@@ -1259,6 +1271,7 @@
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   }
   $("#settingsBtn").addEventListener("click", openSheet);
+  $("#welcomeSettingsBtn").addEventListener("click", openSheet);
   // "Check for updates" (like Violin Toolkit): compares this page with the site's version.json, never cached.
   // The test build also stamps a build on both, so a new test deploy counts as an update. With the offline copy
   // (sw.js), it fetches the new copy into the device and reloads; without one, it opens the new version with ?v=
@@ -1495,19 +1508,29 @@
   // Continue, Switch user and I'm new here (like Violin Toolkit's start overlay).
   const users = () => Object.values(store.users).sort((a, b) => (b.lastUsed || "").localeCompare(a.lastUsed || ""));
   let newYear = null;
+  let chosen = false; // someone has been chosen (useProfile), rather than the welcome screen being up
 
   function showWelcome() {
     const last = store.users[store.current];
     if (!last) return showPanel("new");
+    fillBack(last);
+    showPanel("back");
+  }
+  // The text of the "Welcome back" panel and the user list, written again when the start screens' language changes.
+  function fillBack(last) {
     $("#backName").textContent = last.name;
     renderWeek(last);
     $("#continueBtn").textContent = tx(`Continue as ${last.name}`, `Fortsæt som ${last.name}`);
     const missed = Object.values(missedByDay(last)).reduce((n, l) => n + l.length, 0);
     $("#missedBtn").hidden = !missed;
     $("#missedBtn").textContent = `${tx("Words to practise", "Ord at øve")} (${missed})`;
-    showPanel("back");
+  }
+  function fillUsers() {
+    $("#userList").innerHTML = users().map((u) =>
+      `<button type="button" class="user" data-id="${u.id}"><b>${escapeHtml(u.name)}</b><span>${yearLabel(u.year)}</span></button>`).join("");
   }
   function showPanel(which) {
+    chosen = false;
     show("welcome");
     for (const id of ["new", "back", "switch"]) $("#intro-" + id).hidden = id !== which;
     if (which === "new") {
@@ -1519,8 +1542,7 @@
       $("#newBack").hidden = !users().length;
       $("#newName").focus();
     } else if (which === "switch") {
-      $("#userList").innerHTML = users().map((u) =>
-        `<button type="button" class="user" data-id="${u.id}"><b>${escapeHtml(u.name)}</b><span>${yearLabel(u.year)}</span></button>`).join("");
+      fillUsers();
       $("#userList button")?.focus();
     } else {
       $("#continueBtn").focus();
@@ -1528,6 +1550,7 @@
   }
   function useProfile(id) {
     store.current = id;
+    chosen = true;
     profile = store.users[id];
     profile.lastUsed = new Date().toISOString();
     seenTick = Math.max(0, ...Object.values(profile.seen));
@@ -1667,9 +1690,24 @@
     renderHome();
     $(`#segLang [data-lang="${lang}"]`).focus();
   }
+  // From the welcome screen, with no one chosen: only the start screens change, and no history is touched.
+  function setScreenLang(lang) {
+    shownLang = store.lang = lang;
+    save();
+    applyLang();
+    syncSheet();
+    const last = store.users[store.current];
+    if (last) fillBack(last);
+    fillUsers();
+    for (const b of $("#newYear").children) b.setAttribute("aria-checked", String(b.dataset.year === newYear));
+    setError("name", "");
+    setError("year", "");
+    $(`#segLang [data-lang="${lang}"]`).focus();
+  }
   $("#segLang").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b || b.dataset.lang === (DA() ? "da" : "en")) return showLang(null);
+    if (!chosen) return setScreenLang(b.dataset.lang);
     if (hasHistory()) showLang(b.dataset.lang);
     else switchLang(b.dataset.lang);
   });
