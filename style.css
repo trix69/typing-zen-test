@@ -496,6 +496,19 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   .finger { font-size: 0.85rem; min-height: 0; }
 }
 
+/* Short, wide screens (an iPad on its side under Safari's tab bar, iPad mini, small laptops): the play screen
+   tightens and the keys shrink with the height, so the whole keyboard, space bar included, fits without
+   scrolling (user's request, 2026-10-28). */
+@media (max-height: 800px) and (min-width: 761px) {
+  .app:has(#play:not([hidden])) { padding-block: 12px 8px; }
+  #play.screen { gap: 10px; }
+  #play .stage { padding: 14px 20px; gap: 8px; min-height: 0; }
+  #play .card { gap: 4px; }
+  #play .finger { min-height: 0; }
+  #play .kbd { --kh: clamp(30px, calc((100vh - 420px) / 6), 46px); gap: 5px; }
+  #play .kbd .row { gap: 5px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
