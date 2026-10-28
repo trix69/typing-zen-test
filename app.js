@@ -64,9 +64,10 @@
   // gives both languages to tx(); index.html's own text is swapped from DA_TEXT (data.js) by translatePage().
   // The language on screen: the user's, except that a link ending #dk (or #da, #en) opens the start screens
   // in that language before anyone is chosen, and a new user made there starts in it (user's request: #dk).
-  // With no users yet, the start screens use the language last picked in Settings there (store.lang).
+  // The start screens use store.lang: the language picked in Settings there, or else the last chosen user's
+  // (Hermes R39.1). It is kept in step in useProfile() and switchLang().
   const HASH_LANG = { "#dk": "da", "#da": "da", "#en": "en" }[location.hash.toLowerCase()] || null;
-  let shownLang = HASH_LANG || (store.users[store.current] ? profile.lang : store.lang || "en");
+  let shownLang = HASH_LANG || store.lang || (store.users[store.current] ? profile.lang : "en");
   const DA = () => shownLang === "da";
   const tx = (en, da) => (DA() ? da : en);
 
@@ -1221,6 +1222,7 @@
     save();
     showClear(0);
     renderHome();
+    if (!$("#welcome").hidden) fillBack(profile); // opened from View stats
     $("#switchUserBtn").focus();
   });
   // ---------- Settings ----------
@@ -1259,7 +1261,7 @@
   function closeSheet() {
     sheet.hidden = true;
     document.removeEventListener("keydown", onSheetKey);
-    $(chosen ? "#settingsBtn" : "#welcomeSettingsBtn").focus();
+    $($("#welcome").hidden ? "#settingsBtn" : "#welcomeSettingsBtn").focus();
   }
   // Esc closes the sheet, and Tab stays inside it.
   function onSheetKey(e) {
@@ -1374,7 +1376,8 @@
     // A sample: a letter's press, then its release.
     loadSwitch(currentSwitch()).then(() => { keySound("j"); setTimeout(() => keySound("j", "release"), 110); });
   });
-  $("#statsBtn").addEventListener("click", showWelcome); // View stats: back to the welcome screen's 7 days
+  // View stats: back to the welcome screen's 7 days, with the user still chosen (Hermes R39.2).
+  $("#statsBtn").addEventListener("click", () => showWelcome(true));
   $("#segYear").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
@@ -1510,11 +1513,11 @@
   let newYear = null;
   let chosen = false; // someone has been chosen (useProfile), rather than the welcome screen being up
 
-  function showWelcome() {
+  function showWelcome(keep) {
     const last = store.users[store.current];
     if (!last) return showPanel("new");
     fillBack(last);
-    showPanel("back");
+    showPanel("back", keep);
   }
   // The text of the "Welcome back" panel and the user list, written again when the start screens' language changes.
   function fillBack(last) {
@@ -1529,8 +1532,9 @@
     $("#userList").innerHTML = users().map((u) =>
       `<button type="button" class="user" data-id="${u.id}"><b>${escapeHtml(u.name)}</b><span>${yearLabel(u.year)}</span></button>`).join("");
   }
-  function showPanel(which) {
-    chosen = false;
+  // keep: the current user stays chosen (View stats); every other way here leaves no one chosen.
+  function showPanel(which, keep) {
+    if (!keep) chosen = false;
     show("welcome");
     for (const id of ["new", "back", "switch"]) $("#intro-" + id).hidden = id !== which;
     if (which === "new") {
@@ -1553,6 +1557,7 @@
     chosen = true;
     profile = store.users[id];
     profile.lastUsed = new Date().toISOString();
+    store.lang = profile.lang;
     seenTick = Math.max(0, ...Object.values(profile.seen));
     save();
     shownLang = profile.lang;
@@ -1604,7 +1609,7 @@
     store.users[id] = { ...DEFAULTS(), name, year: newYear, bucket: newYear, lang, voice: DEFAULT_VOICE[lang], id, created: new Date().toISOString() };
     useProfile(id);
   });
-  $("#newBack").addEventListener("click", showWelcome);
+  $("#newBack").addEventListener("click", () => showWelcome());
   $("#continueBtn").addEventListener("click", () => useProfile(store.current));
 
   // Words to practise: an overlay over the stats, one group per day, each with its own Practise button.
@@ -1658,7 +1663,7 @@
   $("#switchBtn").addEventListener("click", () => showPanel("switch"));
   $("#newBtn").addEventListener("click", () => showPanel("new"));
   $("#switchNew").addEventListener("click", () => showPanel("new"));
-  $("#switchBack").addEventListener("click", showWelcome);
+  $("#switchBack").addEventListener("click", () => showWelcome());
   $("#userList").addEventListener("click", (e) => { const b = e.target.closest(".user"); if (b) useProfile(b.dataset.id); });
 
   // ---------- Language setting ----------
@@ -1682,12 +1687,13 @@
   }
   function switchLang(lang) {
     Object.assign(profile, FRESH(), { lang, voice: DEFAULT_VOICE[lang], bucket: profile.year });
-    shownLang = lang;
+    shownLang = store.lang = lang;
     seenTick = 0;
     save();
     applyLang();
     syncSheet();
     renderHome();
+    if (!$("#welcome").hidden) fillBack(profile); // opened from View stats
     $(`#segLang [data-lang="${lang}"]`).focus();
   }
   // From the welcome screen, with no one chosen: only the start screens change, and no history is touched.
