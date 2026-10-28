@@ -255,6 +255,7 @@ kbd {
 .history .stats { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
 /* Use offline (Violin Toolkit's design): a full-width button in Settings, and an overlay with steps per device. */
 .howto-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; height: 44px; border: 1px solid var(--line); border-radius: 12px; background: transparent; color: var(--fg); font: 500 15px var(--font-body); cursor: pointer; }
+a.howto-btn { text-decoration: none; box-sizing: border-box; }
 .howto-btn:hover { border-color: var(--accent); }
 .howto-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .howto-btn svg, .howto-steps svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
