@@ -369,11 +369,15 @@
       .sort((a, b) => (langOf(b) === "en-GB" && FEMALE.test(b.name)) - (langOf(a) === "en-GB" && FEMALE.test(a.name)));
     for (const v of rest) {
       if (out.length >= 3) break;
+      // iOS can list the same voice twice ("Sara" and "Sara"): one entry per name (user's report, 2026-10-29).
+      if (out.some((c) => shortName(c.voice) === shortName(v))) continue;
       used.add(v);
       out.push(extraVoice(v));
     }
     return out;
   }
+  // The name shown in Settings: "Microsoft Ryan Online (Natural) - English (United Kingdom)" → "Ryan".
+  const shortName = (v) => v.name.replace(/\s+-\s+(English|Danish|Dansk).*$/, "").replace(/^Microsoft\s+/, "").replace(/\s+Online \(Natural\)$/, "");
   const extraVoice = (v) => ({ id: v.voiceURI, voice: v, accent: ACCENTS[langOf(v)] || v.lang,
     kind: FEMALE.test(v.name) ? "female" : MALE.test(v.name) ? "male" : "" });
   // The saved choice if this device can meet it, even when a changed voice list (Edge's online voices arriving,
@@ -1319,8 +1323,7 @@
     if (c && !cs.includes(c) && !cs.some((x) => x.id === c.id || x.voice === c.voice)) cs.push(c); // a saved voice outside the three stays listed
     $("#voiceSel").innerHTML = cs.map((c) => {
       const about = (DA() ? ["dansk", { female: "kvinde", male: "mand" }[c.kind]] : [c.accent, c.kind]).filter(Boolean).join(", ");
-      // "Microsoft Ryan Online (Natural) - English (United Kingdom)" → "Ryan"
-      const name = c.voice.name.replace(/\s+-\s+(English|Danish|Dansk).*$/, "").replace(/^Microsoft\s+/, "").replace(/\s+Online \(Natural\)$/, "");
+      const name = shortName(c.voice);
       return `<option value="${escapeHtml(c.id)}">${escapeHtml(name)} (${escapeHtml(about)})</option>`;
     }).join("");
     if (c) $("#voiceSel").value = c.id;
