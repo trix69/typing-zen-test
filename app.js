@@ -963,7 +963,8 @@
     if ($("#play").classList.contains("native") && e.target.closest("#card button, #muteBtn")) e.preventDefault();
   });
   // Tapping the word (like tapping a text box) brings the device keyboard up.
-  $("#play .stage").addEventListener("click", (e) => { if (TOUCH && !e.target.closest("button")) deviceKeyboard(true); });
+  // Phones only: tablets keep the on-screen keyboard until the button is used (Hermes R32.1).
+  $("#play .stage").addEventListener("click", (e) => { if (TOUCH && !TABLET && !e.target.closest("button")) deviceKeyboard(true); });
   $("#kbdToggle").addEventListener("click", () => deviceKeyboard(!$("#play").classList.contains("native")));
 
   // ---------- Events ----------
