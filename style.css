@@ -449,7 +449,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .sheet-card h3 { margin: 14px 0 8px; font: 500 12px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 /* Segmented control: one choice of several, the chosen one filled with the accent. */
 .segc { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-#segOrder { grid-template-columns: repeat(2, 1fr); }
+#segOrder, #segLang { grid-template-columns: repeat(2, 1fr); }
 /* Spelling Bee's length choice: two big buttons side by side. */
 #lenCard { max-width: 380px; }
 .len-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
