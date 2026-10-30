@@ -1083,7 +1083,7 @@
         (e.code ? ` code=${e.code}` : "") + (e.keyCode ? ` kc=${e.keyCode}` : "") + (e.repeat ? " repeat" : "") +
         (e.isComposing ? " composing" : "") + (e.inputType ? ` ${e.inputType}` : "") + (e.isTrusted ? "" : " synthetic") +
         ` on=${el(e.target)} focus=${el(document.activeElement)}${g}` + (navigator.audioSession ? ` audio=${navigator.audioSession.type}` : ""));
-      if (lines.length > 14) lines.shift();
+      if (lines.length > 24) lines.shift();
       box.textContent = lines.join("\n");
     };
     for (const t of ["keydown", "keyup", "beforeinput", "input", "compositionstart", "compositionend"]) window.addEventListener(t, log, true);
@@ -1093,34 +1093,12 @@
       lines.push(`${((performance.now() - t0) / 1000).toFixed(2)} ${e.type === "visibilitychange" ? "visibility=" + document.visibilityState : e.type}` +
         (e.pointerType ? ` ${e.pointerType} on=${el(e.target)}` : e.target === window ? " window" : "") +
         ` focus=${el(document.activeElement)} hasFocus=${document.hasFocus()}`);
-      if (lines.length > 14) lines.shift();
+      if (lines.length > 24) lines.shift();
       box.textContent = lines.join("\n");
     };
     for (const t of ["focus", "blur"]) window.addEventListener(t, (e) => { if (e.target === window) note(e); });
     document.addEventListener("visibilitychange", note);
     window.addEventListener("pointerdown", note, true);
-  }
-
-  // Experiment for the same report (?keyfield in the address): during a game, keep the focus in a hidden
-  // text box that brings up no keyboard of its own, so iPadOS sends the external keyboard's keys to a text
-  // field rather than to the page as a whole. The keys still reach the game's keydown handler below.
-  if (/[?&]keyfield\b/.test(location.search)) {
-    const field = document.createElement("input");
-    field.id = "keyfield";
-    field.className = "typer";
-    field.setAttribute("inputmode", "none");
-    for (const [k, v] of Object.entries({ autocomplete: "off", autocorrect: "off", autocapitalize: "off", spellcheck: "false", "aria-hidden": "true", tabindex: "-1" }))
-      field.setAttribute(k, v);
-    $("#play").append(field);
-    const wanted = () => !$("#play").hidden && !$("#play").classList.contains("native") && !document.querySelector(".sheet:not([hidden])");
-    const hold = () => {
-      if (!wanted()) { if (document.activeElement === field) field.blur(); }
-      else if (document.activeElement !== field) field.focus({ preventScroll: true });
-    };
-    field.addEventListener("input", () => { field.value = ""; }); // a key the game didn't use leaves no text behind
-    field.addEventListener("blur", () => setTimeout(hold, 0));
-    document.addEventListener("pointerup", () => setTimeout(hold, 0));
-    new MutationObserver(hold).observe($("#play"), { attributes: true, attributeFilter: ["hidden", "class"] });
   }
 
   // ---------- Events ----------
