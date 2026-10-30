@@ -1093,6 +1093,18 @@
       box.textContent = lines.join("\n");
     };
     for (const t of ["keydown", "keyup", "beforeinput", "input", "compositionstart", "compositionend"]) window.addEventListener(t, log, true);
+    // Also when the page itself loses or gets the focus, is hidden, or is touched: if keys stop arriving
+    // with no event at all, these show whether Safari moved the keyboard focus away from the page.
+    const note = (e) => {
+      lines.push(`${((performance.now() - t0) / 1000).toFixed(2)} ${e.type === "visibilitychange" ? "visibility=" + document.visibilityState : e.type}` +
+        (e.pointerType ? ` ${e.pointerType} on=${el(e.target)}` : e.target === window ? " window" : "") +
+        ` focus=${el(document.activeElement)} hasFocus=${document.hasFocus()}`);
+      if (lines.length > 14) lines.shift();
+      box.textContent = lines.join("\n");
+    };
+    for (const t of ["focus", "blur"]) window.addEventListener(t, (e) => { if (e.target === window) note(e); });
+    document.addEventListener("visibilitychange", note);
+    window.addEventListener("pointerdown", note, true);
   }
 
   // ---------- Events ----------
