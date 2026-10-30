@@ -232,17 +232,13 @@
   }
 
   // ---------- Sound ----------
-  // iPhones and iPads on silent (the ring/silent switch) mute a web page's sound, in Safari and Chrome alike
-  // (user's report, 2026-10-29). iOS 16.4 and later let a page play like a music app instead, which the switch
-  // doesn't mute. Asked for just before the first sound, so opening the page doesn't stop other music.
-  // The app's own speaker button still turns sound off.
-  function playThroughSilent() {
-    try { if (navigator.audioSession && navigator.audioSession.type !== "playback") navigator.audioSession.type = "playback"; } catch { /* not supported */ }
-  }
+  // iPhones and iPads on silent (the ring/silent switch) mute a web page's sound; Settings > Voice says so.
+  // 1.05 asked iOS to play like a music app (navigator.audioSession.type = "playback") so the switch didn't mute
+  // it. Reverted (user's request, 2026-10-31): on an iPad with an external keyboard, keys then went missing,
+  // with only about one press every 6 seconds reaching the page after each key sound.
   let audio;
   function tone(freq, dur = 0.08, type = "sine", vol = 0.05) {
     if (muted()) return;
-    playThroughSilent();
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
       const o = audio.createOscillator(), g = audio.createGain();
@@ -287,7 +283,6 @@
   function keySound(id, phase = "press") {
     const sw = currentSwitch();
     if (muted() || !sw) return;
-    playThroughSilent();
     loadSwitch(sw);
     const bufs = loaded[sw] && loaded[sw].bufs;
     const name = SPECIAL[id] && SWITCHES[sw] ? `${phase}/${SPECIAL[id]}`
@@ -414,7 +409,6 @@
   function speak(...texts) {
     const run = ++speechRun;
     if (muted() || !("speechSynthesis" in window)) return;
-    playThroughSilent();
     speechSynthesis.cancel();
     const say = (i) => {
       if (run !== speechRun || i >= texts.length) return;
@@ -1088,7 +1082,7 @@
       lines.push(`${((performance.now() - t0) / 1000).toFixed(2)} ${e.type} key=${JSON.stringify(e.key ?? e.data ?? "")}` +
         (e.code ? ` code=${e.code}` : "") + (e.keyCode ? ` kc=${e.keyCode}` : "") + (e.repeat ? " repeat" : "") +
         (e.isComposing ? " composing" : "") + (e.inputType ? ` ${e.inputType}` : "") + (e.isTrusted ? "" : " synthetic") +
-        ` on=${el(e.target)} focus=${el(document.activeElement)}${g}`);
+        ` on=${el(e.target)} focus=${el(document.activeElement)}${g}` + (navigator.audioSession ? ` audio=${navigator.audioSession.type}` : ""));
       if (lines.length > 14) lines.shift();
       box.textContent = lines.join("\n");
     };
@@ -1105,6 +1099,28 @@
     for (const t of ["focus", "blur"]) window.addEventListener(t, (e) => { if (e.target === window) note(e); });
     document.addEventListener("visibilitychange", note);
     window.addEventListener("pointerdown", note, true);
+  }
+
+  // Experiment for the same report (?keyfield in the address): during a game, keep the focus in a hidden
+  // text box that brings up no keyboard of its own, so iPadOS sends the external keyboard's keys to a text
+  // field rather than to the page as a whole. The keys still reach the game's keydown handler below.
+  if (/[?&]keyfield\b/.test(location.search)) {
+    const field = document.createElement("input");
+    field.id = "keyfield";
+    field.className = "typer";
+    field.setAttribute("inputmode", "none");
+    for (const [k, v] of Object.entries({ autocomplete: "off", autocorrect: "off", autocapitalize: "off", spellcheck: "false", "aria-hidden": "true", tabindex: "-1" }))
+      field.setAttribute(k, v);
+    $("#play").append(field);
+    const wanted = () => !$("#play").hidden && !$("#play").classList.contains("native") && !document.querySelector(".sheet:not([hidden])");
+    const hold = () => {
+      if (!wanted()) { if (document.activeElement === field) field.blur(); }
+      else if (document.activeElement !== field) field.focus({ preventScroll: true });
+    };
+    field.addEventListener("input", () => { field.value = ""; }); // a key the game didn't use leaves no text behind
+    field.addEventListener("blur", () => setTimeout(hold, 0));
+    document.addEventListener("pointerup", () => setTimeout(hold, 0));
+    new MutationObserver(hold).observe($("#play"), { attributes: true, attributeFilter: ["hidden", "class"] });
   }
 
   // ---------- Events ----------
