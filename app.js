@@ -15,8 +15,8 @@
   // Timed games: Spelling Bee is a 20-minute session with as many words as Luke can manage.
   // Words come in batches of ROUND.spell, and none repeats within a session.
   // Spelling Bee lengths (user's request, 2026-10-28): one card, then a choice of 10 or 20 minutes.
-  const LENGTHS = { short: 1, long: 2 }; // test build only (live: { short: 10, long: 20 })
-  // The time bar flashes red for the last 2.5% of a session: 30 s of 20 minutes, 3 s of 2 (the test build).
+  const LENGTHS = { quick: 5, short: 10, long: 20 }; // test build only (live: { short: 10, long: 20 })
+  // The time bar flashes red for the last 2.5% of a session: 30 s of 20 minutes, 7.5 s of 5 (the test build).
   const ENDING = 0.025;
   // When time runs out mid-word, Luke gets up to 10 s more to finish that word (user's request, 2026-10-26).
   const GRACE = 10000;
@@ -1142,10 +1142,9 @@
       `<button class="level" data-bucket="${b.name}" role="radio"><b>${b.label}</b><span>${b.words.length} ${tx("words, like", "ord, f.eks.")} ${tx(...b.sample)}</span></button>`).join("");
     for (const id of ["#segYear", "#newYear"])
       $(id).innerHTML = BUCKETS.map((b) => `<button type="button" role="radio" aria-checked="false" data-year="${b.name}">${b.label}</button>`).join("");
-    for (const b of $("#lenChoices").children) {
-      const m = LENGTHS[b.dataset.length];
-      b.textContent = tx(`${m} minute${m === 1 ? "" : "s"}`, `${m} minut${m === 1 ? "" : "ter"}`);
-    }
+    // One button per entry in LENGTHS, so the test build's extra 5-minute choice needs no change to index.html.
+    $("#lenChoices").innerHTML = Object.entries(LENGTHS).map(([id, m]) =>
+      `<button type="button" class="primary" data-length="${id}">${tx(`${m} minute${m === 1 ? "" : "s"}`, `${m} minut${m === 1 ? "" : "ter"}`)}</button>`).join("");
     $("#segSound").innerHTML = SWITCH_LOOK.map(([id, en, enHow, da, daHow, colour, extra]) => {
       const name = tx(en, da), how = tx(enHow, daHow);
       return `<button type="button" role="radio" aria-checked="false" data-sound="${id}" aria-label="${name}" title="${name}: ${how}">${switchPicture(colour, extra)}</button>`;

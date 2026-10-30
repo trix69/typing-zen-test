@@ -458,7 +458,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 #segOrder, #segLang { grid-template-columns: repeat(2, 1fr); }
 /* Spelling Bee's length choice: two big buttons side by side. */
 #lenCard { max-width: 380px; }
-.len-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.len-choices { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; margin-bottom: 12px; }
 .len-choices button { padding: 18px 8px; font: 700 1.15rem var(--font-display); }
 #lenCancel { margin-top: 0; background: transparent; color: var(--fg); border: 1px solid var(--line); }
 .segc button { height: 42px; border: 0; background: transparent; color: var(--fg); font: 500 15px var(--font-body); }
