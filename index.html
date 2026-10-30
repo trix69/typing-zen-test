@@ -48,7 +48,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 </script>
 <!-- /pwa -->
-<link rel="stylesheet" href="style.css?v=24359fae2c">
+<link rel="stylesheet" href="style.css?v=fa8908d6d0">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -69,11 +69,18 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 
     <div class="intro" id="intro-new" hidden>
       <h2>Hello! Let's get you set up</h2>
+      <div class="google-row" id="googleNewRow" hidden>
+        <button type="button" class="google-btn" id="googleNew"><svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.8l7.8-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.2 1.5-5 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg><span>Sign in with Google</span></button>
+        <p class="note">Your progress is saved with your Google account, so it follows you to any device. Google asks you first before it shares your name.</p>
+        <p class="field-error" id="googleErr" role="alert" hidden></p>
+        <p class="or">or type your name to use Typing Zen on this device only</p>
+      </div>
       <form id="newForm" novalidate>
         <div class="field">
           <label for="newName">What's your name?</label>
           <input id="newName" type="text" maxlength="20" autocomplete="off" placeholder="e.g. Luke" required aria-required="true" aria-describedby="nameErr">
           <p class="field-error" id="nameErr" role="alert" hidden></p>
+          <p class="note" id="googleAs" hidden><span id="googleAsText"></span> <button type="button" class="link" id="googleUndo">Type a name instead</button></p>
         </div>
         <div class="field">
           <p class="field-label" id="yearLabel">Which year are you in?</p>
@@ -108,6 +115,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       <h2>Who's typing?</h2>
       <div class="user-list" id="userList"></div>
       <div class="intro-actions">
+        <button type="button" class="ghost google-btn" id="googleSwitch" hidden><svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.2l7.9 6.2C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C1 16.6 0 20.2 0 24s1 7.4 2.7 10.8l7.8-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.2 1.5-5 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg><span>Sign in with Google</span></button>
         <button type="button" class="ghost" id="switchNew">I'm new here</button>
         <button type="button" class="ghost" id="switchBack">Back</button>
       </div>
@@ -248,6 +256,18 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <div class="user-row user-only">
       <button type="button" class="ghost small" id="switchUserBtn">Switch user</button>
       <button type="button" class="ghost small" id="clearBtn">Clear history</button>
+      <button type="button" class="ghost small" id="logoutBtn" hidden>Log out</button>
+    </div>
+    <div class="sync-row" id="syncRow" hidden>
+      <p class="note" id="syncNote"></p>
+      <button type="button" class="ghost small" id="syncSignIn" hidden>Sign in with Google again</button>
+    </div>
+    <div class="clear-confirm" id="logoutConfirm" role="alert" hidden>
+      <p id="logoutAsk"></p>
+      <div class="user-row">
+        <button type="button" class="danger small" id="logoutYes">Log out</button>
+        <button type="button" class="ghost small" id="logoutNo">Cancel</button>
+      </div>
     </div>
     <div class="clear-confirm" id="clearConfirm" role="alert" hidden>
       <p id="clearAsk"></p>
@@ -262,7 +282,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     </div>
     <h3 id="lblStar">Like this app?</h3>
     <a class="howto-btn" id="starLink" href="https://github.com/trix69/typing-zen" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg><span>Star on GitHub</span></a>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="24359fae2c">1.07-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="fa8908d6d0">1.07-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -322,9 +342,9 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <button type="button" class="sheet-done" id="missedDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=24359fae2c"></script>
-<script src="words-da.js?v=24359fae2c"></script>
-<script src="data.js?v=24359fae2c"></script>
-<script src="app.js?v=24359fae2c"></script>
+<script src="words.js?v=fa8908d6d0"></script>
+<script src="words-da.js?v=fa8908d6d0"></script>
+<script src="data.js?v=fa8908d6d0"></script>
+<script src="app.js?v=fa8908d6d0"></script>
 </body>
 </html>

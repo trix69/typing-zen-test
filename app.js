@@ -54,7 +54,11 @@
     u.keySound = { soft: "red", cushioned: "red", thock: "black", tactile: "brown", clicky: "blue" }[u.keySound] || u.keySound;
   }
   let profile = store.users[store.current] || DEFAULTS(); // replaced by useProfile() once someone is chosen
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* storage unavailable */ } };
+  const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* storage unavailable */ } };
+  // A change to the current user's progress or settings: saved here, and for a Google user also sent to the
+  // cloud a few seconds later (onSave is set in the Google section).
+  let onSave = null;
+  const save = () => { saveLocal(); if (onSave) onSave(); };
   // A user's scores and history, as they are after Clear history or a change of language.
   const FRESH = () => ({ bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], practised: {}, learned: {}, streak: {}, beeToday: null });
 
@@ -1234,8 +1238,11 @@
     $("#clearConfirm").hidden = !step;
     $("#clearBtn").hidden = !!step || (!profile.rounds && !Object.keys(profile.tricky).length && !profile.sessions.length);
     if (!step) return;
-    $("#clearAsk").textContent = step === 1 ? tx(`Clear all stars, best speed, tricky words and history for ${profile.name}?`,
-      `Slet alle stjerner, bedste fart, svære ord og historik for ${profile.name}?`)
+    $("#clearAsk").textContent = step === 1 ? (profile.google
+      ? tx(`Clear all stars, best speed, tricky words and history for ${profile.name}, on every device signed in with this Google account?`,
+        `Slet alle stjerner, bedste fart, svære ord og historik for ${profile.name} på alle enheder, der er logget ind med denne Google-konto?`)
+      : tx(`Clear all stars, best speed, tricky words and history for ${profile.name}?`,
+        `Slet alle stjerner, bedste fart, svære ord og historik for ${profile.name}?`))
       : tx("Are you sure? This can't be undone.", "Er du sikker? Det kan ikke fortrydes.");
     $("#clearYes").textContent = step === 1 ? tx("Yes, clear", "Ja, slet") : tx("Yes, clear everything", "Ja, slet alt");
     $("#clearYes").dataset.step = step;
@@ -1246,7 +1253,8 @@
   $("#clearYes").addEventListener("click", () => {
     if ($("#clearYes").dataset.step === "1") return showClear(2);
     // Keeps the name, level, mute, key sound and voice; wipes scores, tricky words and the session history.
-    Object.assign(profile, FRESH());
+    // resetAt: a Google user's other devices drop everything from before it too.
+    Object.assign(profile, FRESH(), { resetAt: new Date().toISOString() });
     save();
     showClear(0);
     renderHome();
@@ -1273,6 +1281,8 @@
     for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
     for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (currentSwitch() || "off")));
     showClear(0);
+    showLogout(false);
+    showSync();
     showLang(null);
     for (const b of $("#segLang").children) b.setAttribute("aria-checked", String(b.dataset.lang === (DA() ? "da" : "en")));
     for (const b of $("#segOrder").children) b.setAttribute("aria-checked", String(b.dataset.order === (profile.practiseOrder === "random" ? "random" : "order")));
@@ -1558,15 +1568,18 @@
   }
   function fillUsers() {
     $("#userList").innerHTML = users().map((u) =>
-      `<button type="button" class="user" data-id="${u.id}"><b>${escapeHtml(u.name)}</b><span>${yearLabel(u.year)}</span></button>`).join("");
+      `<button type="button" class="user" data-id="${u.id}"><b>${escapeHtml(u.name)}</b><span>${yearLabel(u.year)}${u.google ? " · Google" : ""}</span></button>`).join("");
   }
   // keep: the current user stays chosen (View stats); every other way here leaves no one chosen.
   function showPanel(which, keep) {
     if (!keep) chosen = false;
     show("welcome");
     for (const id of ["new", "back", "switch"]) $("#intro-" + id).hidden = id !== which;
+    $("#googleSwitch").hidden = !cloudOn();
     if (which === "new") {
-      $("#newName").value = "";
+      setGoogle(null);
+      $("#googleNewRow").hidden = !cloudOn();
+      setError("google", "");
       newYear = null;
       for (const b of $("#newYear").children) b.setAttribute("aria-checked", "false");
       setError("name", "");
@@ -1587,16 +1600,18 @@
     profile.lastUsed = new Date().toISOString();
     store.lang = profile.lang;
     seenTick = Math.max(0, ...Object.values(profile.seen));
-    save();
+    saveLocal(); // opening a user isn't a change to sync: it would make this device's copy look newest
     shownLang = profile.lang;
     applyLang();
     show("home");
+    if (profile.google) syncNow();
   }
   // Shows (or with "" clears) the message under a question, and marks the field for screen readers.
   function setError(field, text) {
     const el = $(`#${field}Err`);
     el.textContent = text;
     el.hidden = !text;
+    if (field === "google") return;
     (field === "name" ? $("#newName") : $("#newYear")).setAttribute("aria-invalid", String(!!text));
   }
 
@@ -1623,8 +1638,9 @@
   $("#newName").addEventListener("input", () => setError("name", ""));
   $("#newForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const name = tidyName($("#newName").value);
-    const taken = name && users().find((u) => u.name.toLowerCase() === name.toLowerCase());
+    const name = pendingGoogle ? googleName(pendingGoogle) : tidyName($("#newName").value);
+    // A Google name isn't checked: it may match someone who typed theirs, and the list marks which is which.
+    const taken = name && !pendingGoogle && users().find((u) => u.name.toLowerCase() === name.toLowerCase());
     setError("name", !name ? tx("Please type your name. It's needed to keep your progress.", "Skriv dit navn. Det skal bruges til at gemme dine fremskridt.")
       : taken ? tx(`${taken.name} already uses Typing Zen here. Go back and choose Switch user.`,
         `${taken.name} bruger allerede Typing Zen her. Gå tilbage, og vælg Skift bruger.`) : "");
@@ -1635,6 +1651,7 @@
     // A new user starts in the language on screen (the last user's).
     const lang = DA() ? "da" : "en";
     store.users[id] = { ...DEFAULTS(), name, year: newYear, bucket: newYear, lang, voice: DEFAULT_VOICE[lang], id, created: new Date().toISOString() };
+    if (pendingGoogle) Object.assign(store.users[id], { google: googleOf(pendingGoogle), updated: new Date().toISOString() });
     useProfile(id);
   });
   $("#newBack").addEventListener("click", () => showWelcome());
@@ -1694,6 +1711,248 @@
   $("#switchBack").addEventListener("click", () => showWelcome());
   $("#userList").addEventListener("click", (e) => { const b = e.target.closest(".user"); if (b) useProfile(b.dataset.id); });
 
+  // ---------- Google sign-in and sync ----------
+  // Besides a typed name (this device only), a user can sign in with Google (user's request, 2026-10-31): the
+  // name comes from the Google account and can't be edited, and the progress is kept in Firebase (Firestore,
+  // one document per Google account plus one per Spelling Bee session) so it follows them to every device.
+  // FIREBASE is the web app's public config (tools/FIREBASE-SETUP.md); while it is null, or inside another page
+  // (the claude.ai copy), Google sign-in isn't offered. The Firebase SDK is loaded only when it's needed.
+  const FIREBASE = null;
+  const CLOUD = "typingZen.users-test"; // the Firestore collection; the test build uses its own (deploy_test.py)
+  const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/10.12.2/firebase-";
+  const cloudOn = () => !!FIREBASE && window.top === window;
+  let cloud = null; // Promise of { auth, db, au, fs }, once the SDK has loaded and knows who is signed in
+  function loadCloud() {
+    if (!cloud) {
+      cloud = Promise.all(["app", "auth", "firestore"].map((n) => import(`${FIREBASE_SDK}${n}.js`))).then(([app, au, fs]) => {
+        const a = app.initializeApp(FIREBASE), auth = au.getAuth(a);
+        return new Promise((done) => { const off = au.onAuthStateChanged(auth, () => { off(); done({ auth, db: fs.getFirestore(a), au, fs }); }); });
+      });
+      cloud.catch(() => { cloud = null; }); // offline: try again next time
+    }
+    return cloud;
+  }
+  const googleName = (u) => tidyName(u.displayName || (u.email || "").split("@")[0]).slice(0, 40);
+  const googleOf = (u) => ({ uid: u.uid, email: u.email || "" });
+  let pendingGoogle = null; // signed in, with no progress saved yet: the new-user form asks only for the year
+
+  // The new-user form for a Google user: the name is Google's and is shown but can't be edited.
+  function setGoogle(u) {
+    pendingGoogle = u;
+    const input = $("#newName");
+    input.readOnly = !!u;
+    input.classList.toggle("locked", !!u);
+    input.value = u ? googleName(u) : "";
+    $("#googleAs").hidden = !u;
+    $("#googleNewRow").hidden = !!u || !cloudOn();
+    if (u) $("#googleAsText").textContent = tx(`Your name comes from your Google account (${u.email}).`, `Dit navn kommer fra din Google-konto (${u.email}).`);
+  }
+  async function signInGoogle() {
+    const c = await loadCloud();
+    const provider = new c.au.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    return (await c.au.signInWithPopup(c.auth, provider)).user;
+  }
+  const signInError = (e) => {
+    const code = (e && e.code) || "";
+    if (/popup-closed-by-user|cancelled-popup-request/.test(code)) return "";
+    if (/popup-blocked/.test(code)) return tx("The Google window was blocked. Allow pop-ups for this site and try again.", "Google-vinduet blev blokeret. Tillad pop op-vinduer for denne side, og prøv igen.");
+    return navigator.onLine ? tx("Couldn't sign in with Google. Please try again.", "Kunne ikke logge ind med Google. Prøv igen.")
+      : tx("You're offline. Signing in with Google needs the internet.", "Du er offline. Det kræver internet at logge ind med Google.");
+  };
+  // From the new-user form or Who's typing: a Google account already on this device opens its user; one with
+  // progress saved from another device becomes a user here; a new one fills in the form's name.
+  async function googleStart(btn) {
+    setError("google", "");
+    btn.disabled = true;
+    try {
+      const u = await signInGoogle();
+      const mine = users().find((x) => x.google && x.google.uid === u.uid);
+      if (mine) { mine.name = googleName(u); return useProfile(mine.id); }
+      const c = await loadCloud();
+      const snap = await c.fs.getDoc(c.fs.doc(c.db, CLOUD, u.uid));
+      if (snap.exists()) {
+        const r = snap.data(), id = newId();
+        store.users[id] = { ...DEFAULTS(), ...pickShared(r.p || {}), name: googleName(u), google: googleOf(u), id,
+          created: new Date().toISOString(), updated: r.updated || "", resetAt: r.resetAt || "" };
+        return useProfile(id); // the sessions come with the first sync
+      }
+      if ($("#intro-new").hidden) showPanel("new");
+      setGoogle(u);
+      $("#newYear button").focus();
+    } catch (e) {
+      if ($("#intro-new").hidden) showPanel("new");
+      setError("google", signInError(e));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  $("#googleNew").addEventListener("click", () => googleStart($("#googleNew")));
+  $("#googleSwitch").addEventListener("click", () => googleStart($("#googleSwitch")));
+  $("#googleUndo").addEventListener("click", () => { setGoogle(null); $("#newName").focus(); });
+
+  // Syncing. Nothing is lost when two devices were used apart: sessions are joined (by when they ended),
+  // best speed, stars and rounds keep the higher number, words seen, learned and practised are joined word by
+  // word, and the rest (year, level, tricky words, sounds, voice, language) comes from whichever copy was
+  // changed last (`updated`). Clear history and a change of language set `resetAt`, which wins over anything
+  // older on every device.
+  const SYNC_MAX = ["bestWpm", "stars", "rounds"];
+  const SYNC_LATEST = ["year", "bucket", "tricky", "streak", "beeToday", "mute", "keySound", "voice", "practiseOrder", "lang"];
+  const SYNC_JOINED = ["seen", "learned", "practised"];
+  const pickShared = (p) => Object.fromEntries([...SYNC_MAX, ...SYNC_LATEST, ...SYNC_JOINED].filter((k) => k in p).map((k) => [k, p[k]]));
+  function mergeProfile(p, r, sessions) {
+    if (r && r.resetAt > (p.resetAt || "")) {
+      Object.assign(p, FRESH(), { resetAt: r.resetAt });
+      p.cloud.sentTo = r.resetAt;
+    }
+    const rp = (r && r.p) || {};
+    for (const k of SYNC_MAX) p[k] = Math.max(p[k] || 0, rp[k] || 0);
+    if (r && (r.updated || "") > (p.updated || "")) {
+      for (const k of SYNC_LATEST) if (k in rp) p[k] = rp[k];
+      p.updated = r.updated;
+    }
+    for (const [k, n] of Object.entries(rp.seen || {})) p.seen[k] = Math.max(p.seen[k] || 0, n);
+    for (const [w, d] of Object.entries(rp.learned || {})) if (!(p.learned[w] >= d)) p.learned[w] = d;
+    for (const day of Object.keys(rp.practised || {})) {
+      const d = practisedOn(p, day);
+      for (const [w, n] of Object.entries(practisedOn(rp, day))) d[w] = Math.max(d[w] || 0, n);
+      p.practised[day] = d;
+    }
+    const byDate = new Map(p.sessions.map((x) => [x.date, x]));
+    for (const x of sessions) if (x && x.date && !byDate.has(x.date)) byDate.set(x.date, x);
+    p.sessions = [...byDate.values()].filter((x) => !p.resetAt || x.date >= p.resetAt)
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).slice(-500);
+  }
+  let syncing = null, syncAgain = false, syncTimer = 0;
+  // A change to a Google user: mark it newer and send it a few seconds later (several changes go together).
+  onSave = () => {
+    if (!chosen || !profile.google) return;
+    profile.updated = new Date().toISOString();
+    saveLocal();
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncNow, 4000);
+  };
+  function syncNow() {
+    clearTimeout(syncTimer);
+    if (!chosen || !profile.google || !cloudOn()) return Promise.resolve();
+    if (syncing) { syncAgain = true; return syncing; }
+    const p = profile, cs = p.cloud || (p.cloud = {});
+    cs.state = "busy";
+    showSync();
+    syncing = (async () => {
+      const c = await loadCloud(), { fs } = c;
+      if (!c.auth.currentUser || c.auth.currentUser.uid !== p.google.uid) { cs.state = "out"; return; }
+      const ref = fs.doc(c.db, CLOUD, p.google.uid), col = fs.collection(ref, "sessions");
+      const sentTo = cs.sentTo || "", mine = p.sessions.filter((x) => x.date > sentTo); // made here since the last sync
+      const r = (await fs.getDoc(ref)).data() || null;
+      const got = await fs.getDocs(fs.query(col, fs.where("up", ">", fs.Timestamp.fromMillis(cs.pulled || 0))));
+      let pulled = cs.pulled || 0;
+      const theirs = got.docs.map((d) => { const x = d.data(); pulled = Math.max(pulled, x.up ? x.up.toMillis() : 0); delete x.up; return x; });
+      const lang = p.lang;
+      mergeProfile(p, r, theirs);
+      // Up: this device's new sessions, then the profile; a reset made here also clears the older sessions there.
+      const writes = mine.filter((x) => !p.resetAt || x.date >= p.resetAt).map((x) => (b) => b.set(fs.doc(col, x.date), { ...x, up: fs.serverTimestamp() }));
+      if (p.resetAt && (!r || (r.resetAt || "") < p.resetAt)) {
+        for (const d of (await fs.getDocs(fs.query(col, fs.where("date", "<", p.resetAt)))).docs) writes.push((b) => b.delete(d.ref));
+      }
+      writes.push((b) => b.set(ref, { p: pickShared(p), updated: p.updated || "", resetAt: p.resetAt || "" }));
+      for (let i = 0; i < writes.length; i += 400) {
+        const b = fs.writeBatch(c.db);
+        for (const w of writes.slice(i, i + 400)) w(b);
+        await b.commit();
+      }
+      cs.sentTo = p.sessions.reduce((m, x) => (x.date > m ? x.date : m), sentTo);
+      cs.pulled = pulled;
+      cs.at = new Date().toISOString();
+      cs.state = "ok";
+      if (p === profile) refreshAfterSync(lang !== p.lang);
+    })().catch(() => { cs.state = navigator.onLine ? "error" : "offline"; }).finally(() => {
+      syncing = null;
+      saveLocal();
+      showSync();
+      if (syncAgain) { syncAgain = false; syncNow(); }
+    });
+    return syncing;
+  }
+  // What's on screen follows the merged progress (never in the middle of a game).
+  function refreshAfterSync(langChanged) {
+    seenTick = Math.max(0, ...Object.values(profile.seen));
+    if (langChanged) { shownLang = store.lang = profile.lang; applyLang(); }
+    if (!$("#home").hidden) renderHome();
+    if (!$("#welcome").hidden && !$("#intro-back").hidden) fillBack(profile);
+    if (!sheet.hidden) syncSheet();
+  }
+  // Leaving the page (or the iPad going to sleep) sends a waiting change now; coming back fetches the others'.
+  document.addEventListener("visibilitychange", () => syncNow());
+  window.addEventListener("online", () => syncNow());
+
+  // Settings for a Google user: how the sync is going, and Log out.
+  function showSync() {
+    const g = chosen && profile.google && cloudOn();
+    $("#syncRow").hidden = !g;
+    $("#logoutBtn").hidden = !g;
+    if (!g) return;
+    const cs = profile.cloud || {}, email = profile.google.email;
+    const at = cs.at ? new Date(cs.at).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }) : "";
+    $("#syncNote").textContent = {
+      busy: tx("Syncing with Google…", "Synkroniserer med Google …"),
+      out: tx(`Not syncing: sign in with Google as ${email} again.`, `Synkroniserer ikke: log ind med Google som ${email} igen.`),
+      offline: tx("Offline. Progress is kept on this device and syncs when you're back online.", "Offline. Fremskridt gemmes på denne enhed og synkroniseres, når du er online igen."),
+      error: tx("Couldn't sync just now. It will try again.", "Kunne ikke synkronisere lige nu. Det prøves igen."),
+    }[cs.state] || (at ? tx(`Synced with Google (${email}) at ${at}.`, `Synkroniseret med Google (${email}) kl. ${at}.`)
+      : tx(`Signed in with Google (${email}).`, `Logget ind med Google (${email}).`));
+    $("#syncSignIn").hidden = cs.state !== "out";
+  }
+  $("#syncSignIn").addEventListener("click", async () => {
+    try {
+      const u = await signInGoogle();
+      if (u.uid !== profile.google.uid) {
+        $("#syncNote").textContent = tx(`That's a different Google account (${u.email}). Sign in as ${profile.google.email}.`,
+          `Det er en anden Google-konto (${u.email}). Log ind som ${profile.google.email}.`);
+        return;
+      }
+      await syncNow();
+    } catch (e) {
+      const m = signInError(e);
+      if (m) $("#syncNote").textContent = m;
+    }
+  });
+  // Log out warns first: this user and their history leave this device (they stay with the Google account and
+  // come back on signing in again). Anything not yet synced is sent first; if that fails, it says it will be lost.
+  const unsynced = () => { const cs = profile.cloud || {}; return (profile.updated || "") > (cs.at || "") || profile.sessions.some((x) => x.date > (cs.sentTo || "")); };
+  function showLogout(on) {
+    $("#logoutConfirm").hidden = !on;
+    if (!on) return;
+    const n = profile.name;
+    $("#logoutAsk").textContent = tx(
+      `Log ${n} out? ${n} and all of ${n}'s history (stars, best speed, tricky words, words to practise and the last 7 days) will be removed from this device. It stays saved with the Google account and comes back when ${n} signs in with Google again.`,
+      `Log ${n} ud? ${n} og hele ${owner(n)} historik (stjerner, bedste fart, svære ord, ord at øve og de sidste 7 dage) fjernes fra denne enhed. Den forbliver gemt på Google-kontoen og kommer tilbage, når ${n} logger ind med Google igen.`) +
+      (unsynced() ? " " + tx("Some progress from this device isn't saved to Google yet; it will be sent first, but if this device is offline it will be lost.",
+        "Nogle fremskridt fra denne enhed er ikke gemt på Google endnu; de sendes først, men hvis enheden er offline, går de tabt.") : "");
+    $("#logoutYes").textContent = tx("Log out", "Log ud");
+    $("#logoutYes").focus();
+  }
+  $("#logoutBtn").addEventListener("click", () => { showClear(0); showLogout(true); });
+  $("#logoutNo").addEventListener("click", () => { showLogout(false); $("#logoutBtn").focus(); });
+  $("#logoutYes").addEventListener("click", async () => {
+    const p = profile;
+    $("#logoutYes").disabled = true;
+    await Promise.race([syncNow(), new Promise((r) => setTimeout(r, 8000))]);
+    try {
+      const c = await Promise.race([loadCloud(), new Promise((r) => setTimeout(r, 3000))]);
+      if (c && c.auth.currentUser && c.auth.currentUser.uid === p.google.uid) await c.au.signOut(c.auth);
+    } catch { /* offline: the account is forgotten here anyway */ }
+    $("#logoutYes").disabled = false;
+    delete store.users[p.id];
+    chosen = false;
+    store.current = users()[0] ? users()[0].id : null;
+    profile = store.users[store.current] || DEFAULTS();
+    saveLocal();
+    sheet.hidden = true;
+    document.removeEventListener("keydown", onSheetKey);
+    showWelcome();
+  });
+
   // ---------- Language setting ----------
   // Switching clears the user's history (user's request, 2026-10-29), so it asks first, in the language on
   // screen, when there is any history to lose.
@@ -1714,7 +1973,7 @@
     $("#langYes").focus();
   }
   function switchLang(lang) {
-    Object.assign(profile, FRESH(), { lang, voice: DEFAULT_VOICE[lang], bucket: profile.year });
+    Object.assign(profile, FRESH(), { lang, voice: DEFAULT_VOICE[lang], bucket: profile.year, resetAt: new Date().toISOString() });
     shownLang = store.lang = lang;
     seenTick = 0;
     save();
