@@ -1072,6 +1072,29 @@
   $("#play .stage").addEventListener("click", (e) => { if (TOUCH && !TABLET && !e.target.closest("button")) deviceKeyboard(true); });
   $("#kbdToggle").addEventListener("click", () => deviceKeyboard(!$("#play").classList.contains("native")));
 
+  // ---------- Key log (?keylog in the address) ----------
+  // For finding out why keys from an iPad's external keyboard are sometimes missed (user's report,
+  // 2026-10-30): lists the last key events as the page receives them, before the game handles them.
+  if (/[?&]keylog\b/.test(location.search)) {
+    const box = document.createElement("pre");
+    box.id = "keylog";
+    box.style.cssText = "position:fixed;left:4px;bottom:4px;z-index:99;margin:0;padding:6px 8px;max-width:calc(100vw - 8px);" +
+      "font:11px/1.35 ui-monospace,monospace;background:rgba(0,0,0,.78);color:#fff;border-radius:6px;pointer-events:none;white-space:pre-wrap";
+    document.body.append(box);
+    const lines = [], t0 = performance.now();
+    const el = (x) => (x && x.nodeType === 1 ? x.id || x.tagName.toLowerCase() : String(x));
+    const log = (e) => {
+      const g = game && !$("#play").hidden ? ` want=${JSON.stringify(game.items[game.idx].target[game.typed.length] || "")}${game.wait ? " wait=" + game.wait : ""}${game.leaving ? " leaving" : ""}` : "";
+      lines.push(`${((performance.now() - t0) / 1000).toFixed(2)} ${e.type} key=${JSON.stringify(e.key ?? e.data ?? "")}` +
+        (e.code ? ` code=${e.code}` : "") + (e.keyCode ? ` kc=${e.keyCode}` : "") + (e.repeat ? " repeat" : "") +
+        (e.isComposing ? " composing" : "") + (e.inputType ? ` ${e.inputType}` : "") + (e.isTrusted ? "" : " synthetic") +
+        ` on=${el(e.target)} focus=${el(document.activeElement)}${g}`);
+      if (lines.length > 14) lines.shift();
+      box.textContent = lines.join("\n");
+    };
+    for (const t of ["keydown", "keyup", "beforeinput", "input", "compositionstart", "compositionend"]) window.addEventListener(t, log, true);
+  }
+
   // ---------- Events ----------
   document.addEventListener("keydown", (e) => {
     if (e.target.id === "newName") return; // typing a name on the welcome screen
