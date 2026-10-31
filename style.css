@@ -414,10 +414,11 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 #play.native .kbd-toggle { background: var(--panel); color: var(--fg); border: 1px solid var(--line); }
 
 /* On-screen keyboard */
-.kbd { --u: min(52px, calc((100vw - 32px) / 15)); --kh: 46px; display: flex; flex-direction: column; gap: 6px; align-items: center; user-select: none; }
-.kbd .row { display: flex; gap: 6px; }
+/* --g is the gap between keys; each key is that much narrower than its share, so every row ends at the same place. */
+.kbd { --u: min(52px, calc((100vw - 32px) / 15)); --kh: 46px; --g: 6px; display: flex; flex-direction: column; gap: var(--g); align-items: center; user-select: none; }
+.kbd .row { display: flex; gap: var(--g); }
 .kbd .key {
-  width: calc(var(--u) * var(--w, 1) - 6px); height: var(--kh); border-radius: 9px; display: grid; place-items: center;
+  width: calc(var(--u) * var(--w, 1) - var(--g)); height: var(--kh); border-radius: 9px; display: grid; place-items: center;
   font: 700 1.05rem var(--font-type); color: var(--fg);
   /* Even border plus a shadow for the raised bottom edge. A thicker border-bottom on rounded keys made
      Chrome on Luke's Mac fill the lower rows solid with the border colour. */
@@ -504,9 +505,8 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 
 /* Smaller screens: shrink the keyboard so it never forces sideways scroll. */
 @media (max-width: 760px) {
-  .kbd { --kh: 38px; gap: 4px; }
-  .kbd .row { gap: 4px; }
-  .kbd .key { width: calc(var(--u) * var(--w, 1) - 4px); font-size: 0.85rem; border-radius: 6px; }
+  .kbd { --kh: 38px; --g: 4px; }
+  .kbd .key { font-size: 0.85rem; border-radius: 6px; }
   .kbd .key.named { font-size: 0.6rem; padding: 0 0 3px 4px; }
   /* "backspace" runs off its key at this size, so the key shows ⌫ instead (user's request, 2026-11-01). */
   .kbd .key[data-short] { font-size: 0; place-items: center; padding: 0; }
@@ -542,8 +542,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   #play .finger { min-height: 0; }
   /* dvh is the height actually visible; iPadOS Safari's vh and the media query may both see the taller large
      viewport (Hermes' note on R31), hence the 900px trigger too. vh is the fallback for older browsers. */
-  #play .kbd { --kh: clamp(30px, calc((100vh - 420px) / 6), 46px); --kh: clamp(30px, calc((100dvh - 420px) / 6), 46px); gap: 5px; }
-  #play .kbd .row { gap: 5px; }
+  #play .kbd { --kh: clamp(30px, calc((100vh - 420px) / 6), 46px); --kh: clamp(30px, calc((100dvh - 420px) / 6), 46px); --g: 5px; }
 }
 
 /* The play screen fills tablets and computers (user's request, 2026-10-31, from a photo of Luke's iPad, where it
@@ -572,8 +571,19 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
     --u: min(calc((100vw - 40px) / 15), 90px);
     --kh: min(calc(var(--u) * 0.78), 5.5vh); --kh: min(calc(var(--u) * 0.78), 5.5dvh);
   }
-  #play .kbd .key { font-size: calc(var(--kh) * 0.42); border-radius: calc(var(--kh) * 0.2); }
-  #play .kbd .key.named { font-size: calc(var(--kh) * 0.26); padding: 0 0 calc(var(--kh) * 0.12) calc(var(--kh) * 0.2); }
+  /* On a short screen (a phone on its side) the keys are low, so the text keeps a readable size (user, 2026-11-01). */
+  #play .kbd .key { font-size: max(calc(var(--kh) * 0.42), 13px); border-radius: calc(var(--kh) * 0.2); }
+  #play .kbd .key.named { font-size: max(calc(var(--kh) * 0.3), 11px); padding: 0 0 calc(var(--kh) * 0.12) calc(var(--kh) * 0.2); }
+}
+
+/* A phone on its side (user's screenshot, 2026-11-01): under 500px tall the play screen was 30-40px taller than
+   the screen, so the spacing tightens; nothing is hidden. */
+@media (min-width: 761px) and (max-height: 500px) {
+  .app:has(#play:not([hidden])) { padding-block: 4px 2px; }
+  #play.screen { gap: 3px; }
+  #play .stage { padding: 4px 12px; gap: 0; }
+  #play .card { gap: 2px; }
+  #play .line { font-size: min(5.4rem, 9dvh); line-height: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
