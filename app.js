@@ -821,9 +821,13 @@
     if (game.itemStart === null) game.itemStart = performance.now();
     const { key } = baseKey(ch);
     const k = keyEl(key);
+    // A word that starts its example sentence ("_____ go to the park.") may be typed with a capital first letter
+    // (user's request, 2026-11-01): it counts as right, and the word is kept as it is in the list.
+    const capitalOk = !game.typed && it.word && it.sentence && ch !== want && ch === want.toUpperCase() &&
+      findWord(it.sentence, it.word) === it.sentence.search(/\p{L}/u);
 
-    if (ch === want) {
-      game.typed += ch;
+    if (ch === want || capitalOk) {
+      game.typed += want;
       game.correct++;
       game.posErr = 0;
       game.revealed = false;
