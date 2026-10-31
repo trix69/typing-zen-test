@@ -536,10 +536,6 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 }
 /* Phones: the game title gets its own row, so Home, the clock, the live speed and sound fit on one row below it. */
 @media (max-width: 480px) {
-  /* "backspace" runs off its key on a phone (below about 455px), so the key shows ⌫ instead (user's request,
-     2026-11-01); wider, the word fits (Hermes R53.1). */
-  .kbd .key[data-short] { font-size: 0; place-items: center; padding: 0; }
-  .kbd .key[data-short]::after { content: attr(data-short); font: 400 1.15rem var(--font-body); color: var(--fg); }
   .topbar { gap: 8px; }
   .topbar .title { flex-basis: 100%; order: -1; }
   .topbar .live { margin-left: auto; font-size: 0.85rem; }
@@ -550,6 +546,12 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   .card { gap: 6px; }
   .card .meaning, .card .clue { font-size: 1rem; }
   .finger { font-size: 0.85rem; min-height: 0; }
+}
+/* "backspace" doesn't fit its key below 500px wide (with the border, Hermes R53.1/R53.2), so the key shows ⌫ there
+   instead (user's request, 2026-11-01). */
+@media (max-width: 499px) {
+  .kbd .key[data-short] { font-size: 0; place-items: center; padding: 0; }
+  .kbd .key[data-short]::after { content: attr(data-short); font: 400 1.15rem var(--font-body); color: var(--fg); }
 }
 
 /* Short, wide screens (an iPad on its side under Safari's tab bar, iPad mini, small laptops; up to 900px, so an

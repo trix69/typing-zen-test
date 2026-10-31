@@ -1003,8 +1003,9 @@
     // right in the same session is only in the last group.
     const masteredNow = [...game.newMastered];
     const rightOnly = [...new Set(game.firstTry)].filter((w) => !game.newMastered.has(w) && !game.missed.has(w));
-    $("#resFirst").textContent = game.mode === "spell" ? game.firstTry.length - game.firstTry.filter((w) => game.newMastered.has(w)).length : game.firstTry.length;
-    $("#resStruggled").textContent = game.struggled.length;
+    // Each Spelling Bee figure counts its own word list (Hermes R55.1).
+    $("#resFirst").textContent = game.mode === "spell" ? rightOnly.length : game.firstTry.length;
+    $("#resStruggled").textContent = game.mode === "spell" ? game.missed.size : game.struggled.length;
     for (const id of ["#figFirst", "#figStruggled"]) $(id).hidden = !game.endsAt;
     // Spelling Bee: the words mastered in this session (user's request, 2026-11-01).
     $("#figMastered").hidden = game.mode !== "spell";
@@ -1653,7 +1654,10 @@
       return masteredOf(resultsIn(u, level.name, end.getTime())).size;
     });
     const pct = (n) => Math.round((n / total) * 100);
-    const now = counts[6], gain = now - counts[0];
+    // The week's gain counts from the start of its first day, so a word mastered that day counts (Hermes R55.2).
+    const start = new Date(days[0].d);
+    start.setHours(0, 0, 0, 0);
+    const now = counts[6], gain = now - masteredOf(resultsIn(u, level.name, start.getTime())).size;
     $("#masterLine").innerHTML = tx(`Mastered: <b>${pct(now)}%</b> of ${level.label} words (${now} of ${total})`,
       `Mestret: <b>${pct(now)}%</b> af ordene i ${level.label} (${now} af ${total})`) +
       (gain > 0 ? tx(` · <b>+${gain}</b> this week`, ` · <b>+${gain}</b> denne uge`) : "");
