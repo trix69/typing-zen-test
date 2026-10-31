@@ -845,9 +845,9 @@
       line.classList.remove("shake"); void line.offsetWidth; line.classList.add("shake");
       if (k) { k.classList.add("miss"); setTimeout(() => k.classList.remove("miss"), 200); }
       if (it.hidden && game.revealed) $("#msg").textContent = tx("Here's a hint: type the orange letter.", "Her er et hint: skriv det orange bogstav.");
-      // Practice: a real slip starts this word's 5 again, here and in the saved count (user's request,
-      // 2026-10-28). One typo put right before the hint is forgiven, as in Spelling Bee.
-      if (game.mode === "practise" && (game.errAt.size > 1 || game.hinted)) { it.reps = 0; showReps(it); savePractice(practiceDay, it.word, 0, true); }
+      // Practice: a slip starts this word's 5 again, here and in the saved count (user's request, 2026-10-28).
+      // Any wrong key counts, even one typo put right at once (user's request, 2026-11-01).
+      if (game.mode === "practise") { it.reps = 0; showReps(it); savePractice(practiceDay, it.word, 0, true); }
     }
     renderLine();
   }
@@ -862,8 +862,9 @@
 
     // Timed games count each word: right first try (no wrong key at all), or needed another try.
     // One typo, put right before the orange hint showed, still counts as right first try (user's request,
-    // 2026-10-28), in Practice too; wrong keys on two letters, or a hint, don't.
-    const missed = game.itemErr > 0 && (game.errAt.size > 1 || game.hinted);
+    // 2026-10-28); wrong keys on two letters, or a hint, don't. In Practice any wrong key is a mistake (user's
+    // request, 2026-11-01).
+    const missed = game.itemErr > 0 && (game.mode === "practise" || game.errAt.size > 1 || game.hinted);
     if (game.endsAt) (missed ? game.struggled : game.firstTry).push(it.word);
     // Word Garden is the learning mode: the words typed there wait for Spelling Bee (7 days at most).
     if (game.mode === "words") {
