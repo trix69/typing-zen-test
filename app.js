@@ -1462,9 +1462,12 @@
       const d = s && s.date ? new Date(s.date) : null;
       if (!d || isNaN(d)) continue;
       const k = d.toDateString();
-      const t = days[k] || (days[k] = { words: 0, first: 0 });
+      const t = days[k] || (days[k] = { words: 0, first: 0, practised: 0 });
       t.first += s.firstTry || 0;
       t.words += (s.firstTry || 0) + (s.struggled || 0);
+      // Of those not right first try, the ones practised all 5 times since (light green in the week chart).
+      const reps = practisedOn(u, k);
+      if (Array.isArray(s.struggledWords)) t.practised += s.struggledWords.filter((w) => reps[w] >= PRACTISE_REPS).length;
     }
     return days;
   }
@@ -1482,6 +1485,25 @@
     }
     return Object.fromEntries(Object.entries(days).filter(([, l]) => l.length)
       .sort(([a], [b]) => new Date(b) - new Date(a)));
+  }
+  // Both lists for the stats (user's request, 2026-11-01): per local day of the last 7 (newest first), the words
+  // right first try and the words that need more practice. A word that needed another try that day is only in the
+  // second list, even if another session got it right first time.
+  function wordsByDay(u) {
+    const missed = missedByDay(u), from = new Date();
+    from.setHours(0, 0, 0, 0);
+    from.setDate(from.getDate() - 6);
+    const days = {};
+    for (const s of u.sessions || []) {
+      const d = s && s.date ? new Date(s.date) : null;
+      if (!d || isNaN(d) || d < from || !Array.isArray(s.firstTryWords)) continue;
+      const again = missed[d.toDateString()] || [];
+      const list = days[d.toDateString()] || (days[d.toDateString()] = []);
+      for (const w of s.firstTryWords) if (typeof w === "string" && !list.includes(w) && !again.includes(w)) list.push(w);
+    }
+    for (const day of Object.keys(missed)) days[day] = days[day] || [];
+    return Object.entries(days).filter(([day, l]) => l.length || (missed[day] || []).length)
+      .sort(([a], [b]) => new Date(b) - new Date(a)).map(([day, first]) => ({ day, first, again: missed[day] || [] }));
   }
   // Spelling Bee today: { day, clean: { word: times right first try today } }; starts again each new day.
   function beeToday() {
@@ -1522,7 +1544,7 @@
       const d = new Date();
       d.setHours(12, 0, 0, 0); // midday, so a daylight-saving change can't skip or repeat a day
       d.setDate(d.getDate() - i);
-      days.push({ d, ...(totals[d.toDateString()] || { words: 0, first: 0 }) });
+      days.push({ d, ...(totals[d.toDateString()] || { words: 0, first: 0, practised: 0 }) });
     }
     const week = days.reduce((a, x) => ({ words: a.words + x.words, first: a.first + x.first }), { words: 0, first: 0 });
     $("#weekLine").innerHTML = week.words ? `${tx("Last 7 days", "De sidste 7 dage")}: ${wordsAndRate(week)}` : tx("Last 7 days: no words yet.", "De sidste 7 dage: ingen ord endnu.");
@@ -1535,15 +1557,16 @@
       const name = i === 6 ? tx("Today", "I dag") : x.d.toLocaleDateString(locale(), { weekday: "short" });
       const full = x.d.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
       const rate = x.words ? Math.round((x.first / x.words) * 100) + "%" : "–";
-      const again = x.words - x.first;
-      const said = !x.words ? tx("no words", "ingen ord") : tx(`${x.words} word${x.words === 1 ? "" : "s"}: ${x.first} right first try, ${again} needed another try, ${rate} right first try`,
-        `${x.words} ord: ${x.first} rigtigt i første forsøg, ${again} krævede et forsøg mere, ${rate} rigtigt i første forsøg`);
-      // One bar per day in two colours (user's request, 2026-10-27): needed another try (orange) on top of
-      // right first try (green). Empty parts are left out, so the top one always gets the rounded corners.
+      const done = Math.min(x.practised, x.words - x.first), again = x.words - x.first - done;
+      const said = !x.words ? tx("no words", "ingen ord") : tx(`${x.words} word${x.words === 1 ? "" : "s"}: ${x.first} right first try, ${done} practised, ${again} to practise, ${rate} right first try`,
+        `${x.words} ord: ${x.first} rigtigt i første forsøg, ${done} øvet, ${again} skal øves, ${rate} rigtigt i første forsøg`);
+      // One bar per day in three colours (user's requests, 2026-10-27 and 2026-11-01): to practise (orange) on top
+      // of practised (light green) on top of right first try (dark green). Empty parts are left out, so the top
+      // one always gets the rounded corners.
       const h = x.words ? Math.max(6, (x.words / most) * 100) : 0;
       const part = (cls, n) => (n ? `<i class="${cls}" style="height:${(h * n) / x.words}%"></i>` : "");
       return `<li aria-label="${full}: ${said}"><span class="n">${x.words || ""}</span>` +
-        `<span class="bar">${part("again", again)}${part("first", x.first)}</span>` +
+        `<span class="bar">${part("again", again)}${part("practised", done)}${part("first", x.first)}</span>` +
         `<span class="d">${name}</span><span class="r">${rate}</span></li>`;
     }).join("");
   }
@@ -1566,9 +1589,8 @@
     $("#backName").textContent = last.name;
     renderWeek(last);
     $("#continueBtn").textContent = tx(`Continue as ${last.name}`, `Fortsæt som ${last.name}`);
-    const missed = Object.values(missedByDay(last)).reduce((n, l) => n + l.length, 0);
-    $("#missedBtn").hidden = !missed;
-    $("#missedBtn").textContent = `${tx("Words to practise", "Ord at øve")} (${missed})`;
+    $("#missedBtn").hidden = !wordsByDay(last).length;
+    $("#missedBtn").textContent = tx("See the words", "Se ordene");
   }
   function fillUsers() {
     $("#userList").innerHTML = users().map((u) =>
@@ -1661,25 +1683,31 @@
   $("#newBack").addEventListener("click", () => showWelcome());
   $("#continueBtn").addEventListener("click", () => useProfile(store.current));
 
-  // Words to practise: an overlay over the stats, one group per day, each with its own Practise button.
+  // The words of the last 7 days: an overlay over the stats, one group per day with the words right first try and
+  // the words that need more practice (those with their Practise button), in the week chart's two colours.
   const missedSheet = $("#missedSheet");
   function openMissed() {
     const u = store.users[store.current];
     const today = new Date().toDateString(), yesterday = new Date(Date.now() - 864e5).toDateString();
-    $("#missedDays").innerHTML = Object.entries(missedByDay(u)).map(([day, words]) => {
+    const chips = (l) => `<div class="tricky-list">${l}</div>`;
+    $("#missedDays").innerHTML = wordsByDay(u).map(({ day, first, again: words }) => {
       const name = day === today ? tx("Today", "I dag") : day === yesterday ? tx("Yesterday", "I går")
         : new Date(day).toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
       const reps = practisedOn(u, day);
-      const count = words.filter((w) => reps[w] >= PRACTISE_REPS).length;
+      const done = words.filter((w) => reps[w] >= PRACTISE_REPS), todo = words.filter((w) => !(reps[w] >= PRACTISE_REPS));
       const n = words.length;
-      return `<section class="missed-day"><h3>${name} · ${n} ${tx(n === 1 ? "word" : "words", "ord")}${count ? ` · ${count} ${tx("practised", "øvet")}` : ""}</h3>
-        <div class="tricky-list">${words.map((w) => reps[w] >= PRACTISE_REPS
-          ? `<span class="done" title="${tx("Practised", "Øvet")}">✓ ${escapeHtml(w)}</span>`
-          : reps[w] ? `<span title="${tx(`${reps[w]} of ${PRACTISE_REPS} goes done`, `${reps[w]} af ${PRACTISE_REPS} gange klaret`)}">${escapeHtml(w)} <small>${reps[w]}/${PRACTISE_REPS}</small></span>`
-          : `<span>${escapeHtml(w)}</span>`).join("")}</div>
-        <button type="button" class="primary small" data-day="${escapeHtml(day)}">${day === today ? tx("Practise today's " + (n === 1 ? "word" : "words"), "Øv dagens ord")
-          : n === 1 ? tx("Practise this word", "Øv dette ord") : tx("Practise these words", "Øv disse ord")}</button></section>`;
-    }).join("") || `<p class="note">${tx("No words to practise from the last 7 days.", "Ingen ord at øve fra de sidste 7 dage.")}</p>`;
+      const group = (cls, label, l, chip) => (l.length ? `<p class="words-label"><i class="${cls}"></i>${label} (${l.length})</p>` + chips(l.map(chip).join("")) : "");
+      // The same three groups and colours as the week chart.
+      return `<section class="missed-day"><h3>${name}</h3>` +
+        group("first", tx("Right first try", "Rigtigt i første forsøg"), first, (w) => `<span>${escapeHtml(w)}</span>`) +
+        group("practised", tx("Practised", "Øvet"), done, (w) => `<span class="done">✓ ${escapeHtml(w)}</span>`) +
+        group("again", tx("To practise", "Skal øves"), todo, (w) => reps[w]
+          ? `<span title="${tx(`${reps[w]} of ${PRACTISE_REPS} goes done`, `${reps[w]} af ${PRACTISE_REPS} gange klaret`)}">${escapeHtml(w)} <small>${reps[w]}/${PRACTISE_REPS}</small></span>`
+          : `<span>${escapeHtml(w)}</span>`) +
+        (n ? `<button type="button" class="primary small" data-day="${escapeHtml(day)}">${day === today ? tx("Practise today's " + (n === 1 ? "word" : "words"), "Øv dagens ord")
+            : n === 1 ? tx("Practise this word", "Øv dette ord") : tx("Practise these words", "Øv disse ord")}</button>` : "") +
+        `</section>`;
+    }).join("") || `<p class="note">${tx("No words from the last 7 days.", "Ingen ord fra de sidste 7 dage.")}</p>`;
     missedSheet.hidden = false;
     document.addEventListener("keydown", onMissedKey);
     $("#missedCard").focus();

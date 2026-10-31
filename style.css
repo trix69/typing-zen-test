@@ -22,6 +22,8 @@
   --accent: #2f6f4a;
   --on-accent: #ffffff;
   --koi: #d9693c;
+  --bar-first: #2f6f4a; /* the week chart: right first try (dark green), practised (light green) */
+  --bar-practised: #9fd8b3;
   --ok: #1f7a45;
   --bad: #c2463f;
   --scrim: rgba(17, 24, 20, .45);
@@ -55,6 +57,8 @@
     --accent: #6fbf8f;
     --on-accent: #0e1512;
     --koi: #f08a5d;
+    --bar-first: #3f9a66;
+    --bar-practised: #b9ecc9;
     --ok: #63c98d;
     --bad: #f0786f;
     --scrim: rgba(0, 0, 0, .6);
@@ -81,6 +85,8 @@
   --accent: #6fbf8f;
   --on-accent: #0e1512;
   --koi: #f08a5d;
+  --bar-first: #3f9a66;
+  --bar-practised: #b9ecc9;
   --ok: #63c98d;
   --bad: #f0786f;
   --scrim: rgba(0, 0, 0, .6);
@@ -216,8 +222,9 @@ kbd {
 .week-chart .n { font: 500 0.8rem var(--font-mono); color: var(--fg); min-height: 1.2em; font-variant-numeric: tabular-nums; }
 .week-chart .bar { width: 100%; max-width: 40px; height: 80px; display: flex; flex-direction: column; justify-content: flex-end; border-bottom: 1px solid var(--line); }
 /* Each day: needed another try (orange, on top) over right first try (green), as on the results screen. */
-.week-chart .bar i, .week-key i { display: block; flex: none; width: 100%; background: var(--accent); }
-.week-chart .bar i.again, .week-key i.again { background: var(--koi); }
+.week-chart .bar i, .week-key i, .words-label i { display: block; flex: none; width: 100%; background: var(--bar-first); }
+.week-chart .bar i.practised, .week-key i.practised, .words-label i.practised { background: var(--bar-practised); }
+.week-chart .bar i.again, .week-key i.again, .words-label i.again { background: var(--koi); }
 .week-chart .bar i:first-child { border-radius: 6px 6px 0 0; }
 .week-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font: 500 0.75rem var(--font-mono); color: var(--muted); }
 .week-key span { display: inline-flex; align-items: center; gap: 6px; }
@@ -231,6 +238,8 @@ kbd {
 .missed-day { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
 .missed-day:first-child { border-top: 0; }
 .missed-day h3 { margin: 0; }
+.words-label { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 0; font: 500 0.8rem var(--font-mono); color: var(--muted); }
+.words-label i { width: 10px; height: 10px; border-radius: 3px; }
 .missed-day .tricky-list { justify-content: flex-start; margin-top: 0; }
 .missed-day .tricky-list small { font: 500 0.75rem var(--font-mono); color: var(--muted); } /* goes so far, "2/5" */
 .missed-day .tricky-list span.done { color: var(--ok); border-color: var(--ok); } /* practised all 5 times */

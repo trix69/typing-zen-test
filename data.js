@@ -78,10 +78,12 @@ const DA_TEXT = {
   "Let's start": "Lad os starte",
   "Back": "Tilbage",
   "Welcome back,": "Velkommen tilbage,",
-  "Words tested and right first try each day, last 7 days": "Testede ord og rigtige i første forsøg hver dag, de sidste 7 dage",
+  "Words tested each day, last 7 days: right first try, practised and to practise": "Testede ord hver dag, de sidste 7 dage: rigtigt i første forsøg, øvet og skal øves",
   "Right first try": "Rigtigt i første forsøg",
-  "Needed another try": "Krævede et forsøg mere",
-  "Words to practise": "Ord at øve",
+  "Practised": "Øvet",
+  "To practise": "Skal øves",
+  "See the words": "Se ordene",
+  "Last 7 days": "De sidste 7 dage",
   "Continue": "Fortsæt",
   "Switch user": "Skift bruger",
   "I'm new here": "Jeg er ny her",
@@ -156,5 +158,4 @@ const DA_TEXT = {
   "No install icon? Open the browser menu and choose Install Typing Zen. In Safari on a Mac, use File, then Add to Dock. Firefox cannot install apps; keep a bookmark instead.":
     "Intet installationsikon? Åbn browserens menu, og vælg Installer Typing Zen. I Safari på en Mac skal du vælge Arkiv og så Føj til Dock. Firefox kan ikke installere apps; brug et bogmærke i stedet.",
   "🐝 Spelling Bee": "🐝 Stavebien",
-  "Not right first try, last 7 days.": "Ikke rigtigt i første forsøg, de sidste 7 dage.",
 };
