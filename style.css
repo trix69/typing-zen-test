@@ -334,7 +334,8 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .level:disabled { opacity: .45; filter: grayscale(1); cursor: not-allowed; }
 .level b { font: 700 1.25rem var(--font-display); letter-spacing: -0.01em; }
 .level span { font-size: 0.85rem; color: var(--muted); }
-.level .mastery { font: 600 0.8rem var(--font-body); color: var(--accent); letter-spacing: 0; white-space: nowrap; }
+.level .mastery { display: inline-block; vertical-align: 0.2em; margin-left: 4px; padding: 1px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent); font: 600 0.75rem var(--font-body); color: var(--accent); letter-spacing: 0; white-space: nowrap; }
 .level[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
 .card .why { font-size: 0.95rem; color: var(--koi); font-weight: 700; }
 

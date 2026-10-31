@@ -1039,11 +1039,11 @@
     for (const b of document.querySelectorAll(".level")) {
       b.disabled = !open.includes(b.dataset.bucket);
       b.setAttribute("aria-checked", String(b.dataset.bucket === currentBucket().name));
-      // "– 12% mastered" once more than 1% of that year's words are mastered (user's request, 2026-11-01).
+      // A "12% mastered" badge once more than 1% of that year's words are mastered (user's requests, 2026-11-01).
       const lv = BUCKETS.find((x) => x.name === b.dataset.bucket);
       const share = lv.words.length ? (masteredOf(resultsIn(profile, lv.name)).size / lv.words.length) * 100 : 0;
       b.querySelector("b").innerHTML = escapeHtml(lv.label) +
-        (share > 1 ? ` <small class="mastery">– ${Math.round(share)}% ${tx("mastered", "mestret")}</small>` : "");
+        (share > 1 ? ` <small class="mastery">${Math.round(share)}% ${tx("mastered", "mestret")}</small>` : "");
     }
     const parts = [];
     if (profile.rounds) parts.push(`⭐ ${profile.stars} ${tx("stars", "stjerner")}`, `🏃 ${tx("best", "bedst")} ${profile.bestWpm} ${tx("wpm", "ord/min")}`,
