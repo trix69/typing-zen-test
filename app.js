@@ -1720,7 +1720,14 @@
   // one document per Google account plus one per Spelling Bee session) so it follows them to every device.
   // FIREBASE is the web app's public config (tools/FIREBASE-SETUP.md); while it is null, or inside another page
   // (the claude.ai copy), Google sign-in isn't offered. The Firebase SDK is loaded only when it's needed.
-  const FIREBASE = null;
+  const FIREBASE = {
+    apiKey: "AIzaSyBe7H-BsJI6eRYJaIdSy-_ZfFYpbYccPNk",
+    authDomain: "typing-zen.firebaseapp.com",
+    projectId: "typing-zen",
+    storageBucket: "typing-zen.firebasestorage.app",
+    messagingSenderId: "264177378932",
+    appId: "1:264177378932:web:21d84598f0b33b88075321",
+  };
   const CLOUD = "typingZen.users-test"; // the Firestore collection; the test build uses its own (deploy_test.py)
   const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/10.12.2/firebase-";
   const cloudOn = () => !!FIREBASE && window.top === window;
