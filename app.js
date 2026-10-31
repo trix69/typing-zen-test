@@ -1669,7 +1669,7 @@
       `<polyline points="${pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ")}"/></svg>` +
       counts.map((n, i) => {
         const full = days[i].d.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
-        const said = tx(`${full}: ${pct(n)}% mastered (${n} words)`, `${full}: ${pct(n)}% mestret (${n} ord)`);
+        const said = tx(`${full}: ${pct(n)}% mastered (${n} word${n === 1 ? "" : "s"})`, `${full}: ${pct(n)}% mestret (${n} ord)`);
         return `<span class="pt" style="left:${pts[i][0]}%;top:${pts[i][1]}%" title="${said}" role="img" aria-label="${said}"><i></i>` +
           (i === 6 ? `<b>${pct(n)}%</b>` : "") + `</span>`;
       }).join("");
