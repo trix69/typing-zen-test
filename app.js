@@ -1783,9 +1783,10 @@
     if (!h.has("state")) return null;
     let go = null;
     try { go = JSON.parse(localStorage.getItem(GOOGLE_BACK)); } catch {}
-    if (!go || go.state !== h.get("state")) return null;
+    const ours = !!go && go.state === h.get("state"); // not ours: the token still leaves the address (Hermes R50.1)
     localStorage.removeItem(GOOGLE_BACK);
     history.replaceState(null, "", location.pathname + location.search);
+    if (!ours) return null;
     const token = h.get("id_token");
     if (!token) return { why: go.why, user: Promise.reject({ code: "popup-closed-by-user" }) };
     return { why: go.why, user: loadCloud().then((c) => c.au.signInWithCredential(c.auth, c.au.GoogleAuthProvider.credential(token))).then((r) => r.user) };
