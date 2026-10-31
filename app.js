@@ -499,6 +499,21 @@
     return shuffle(picked);
   }
   const byWord = (w) => w.word;
+  // How Spelling Bee and Word Garden fill a round (user's requests, 2026-10-28 and 2026-11-01): words not yet mastered,
+  // those with the shortest run of right-first-try spellings first, then the ones not seen for longest. About one
+  // round in three also brings back one mastered word (the one not seen for longest) to check it; otherwise mastered
+  // words come only when nothing else is left.
+  function pickRound(list, n, mastered) {
+    if (n <= 0) return [];
+    const notYet = list.filter((w) => !mastered.has(w.word)), known = list.filter((w) => mastered.has(w.word));
+    const streakFirst = (w) => profile.streak[w.word] || 0;
+    const check = known.length && Math.random() < 1 / 3 ? freshPick(known, 1, byWord) : [];
+    const picked = [...check, ...freshPick(notYet, n - check.length, byWord, streakFirst)];
+    if (picked.length < n) picked.push(...freshPick(known.filter((w) => !check.includes(w)), n - picked.length, byWord, streakFirst));
+    return picked;
+  }
+  // The level's words mastered so far: in a Spelling Bee also counting this session's spellings.
+  const masteredNow = () => masteredOf(game && game.mode === "spell" ? game.res : resultsIn(profile, currentBucket().name));
   const repeat = (n, make) => Array.from({ length: n }, make).join(" ");
   const randomLetters = (keys, groups, size) => repeat(groups, () => Array.from({ length: size }, () => pick(keys)).join(""));
   // Up-and-down reaches from a home key and back: "frf", "jmj".
@@ -529,8 +544,13 @@
       case "warm":
         // Five different kinds of drill each round, each freshly made.
         return shuffle(WARMUP_KINDS).slice(0, n).map(([en, da, make]) => ({ tag: tx(en, da), target: make() }));
-      case "words":
-        return freshPick(pool, n, byWord).map((w) => ({ ...w, target: w.word }));
+      case "words": {
+        // Picked like Spelling Bee's words; words learned here in the last 7 days and not yet spelled in Spelling Bee
+        // wait, so the garden doesn't keep teaching the same words (user's request, 2026-11-01).
+        const waiting = (w) => Date.parse(profile.learned[w.word]) >= Date.now() - 7 * 864e5;
+        const fresh = pickRound(pool.filter((w) => !waiting(w)), n, masteredNow());
+        return [...fresh, ...freshPick(pool.filter(waiting), n - fresh.length, byWord)].map((w) => ({ ...w, target: w.word }));
+      }
       case "spell": {
         // Each batch (a "round" of 10): up to 3 words come back for another go, then Word Garden words, then
         // fresh ones. Words already in this session are left out, except the retries.
@@ -550,24 +570,14 @@
         const retry = pickN(pool.filter((w) => missedToday.has(w.word) && !doneToday(w) && missedIn[w.word] !== round - 1), 3);
         left = left.filter((w) => !retry.includes(w));
         const tricky = [...retry, ...pickN(left.filter((w) => profile.tricky[w.word]), 3 - retry.length)];
-        // Words learned in Word Garden in the last 7 days come next, before fresh ones (user's request,
-        // 2026-10-28). A word leaves profile.learned once it has been spelled here.
+        // Words learned in Word Garden in the last 7 days come a little sooner than the others: at most 2 a round,
+        // the ones not seen for longest (user's requests, 2026-10-28 and 2026-11-01, "don't repeat them too much").
+        // A word leaves profile.learned once it has been spelled here.
         const week = Date.now() - 7 * 864e5;
-        const learned = shuffle(left.filter((w) => !tricky.includes(w) && Date.parse(profile.learned[w.word]) >= week))
-          .slice(0, n - tricky.length);
-        // A word right first try in several Spelling Bees in a row waits longer (user's request, 2026-10-28):
-        // words are taken by their run of right-first-try spellings, shortest first, then the usual rotation.
-        // Mastered words wait longer still (user's request, 2026-11-01): about one round in three brings one back
-        // to check it, the one not seen for longest; otherwise they come only when the level has no other words.
-        const mastered = masteredOf(playing ? game.res : resultsIn(profile, currentBucket().name));
-        const rest = left.filter((w) => !tricky.includes(w) && !learned.includes(w));
-        const notYet = rest.filter((w) => !mastered.has(w.word)), known = rest.filter((w) => mastered.has(w.word));
-        let need = n - tricky.length - learned.length;
-        const check = need > 0 && known.length && Math.random() < 1 / 3 ? freshPick(known, 1, byWord) : [];
-        need -= check.length;
-        const streakFirst = (w) => profile.streak[w.word] || 0;
-        const fresh = [...check, ...freshPick(notYet, need, byWord, streakFirst)];
-        if (fresh.length - check.length < need) fresh.push(...freshPick(known.filter((w) => !check.includes(w)), need - fresh.length + check.length, byWord, streakFirst));
+        const learned = freshPick(left.filter((w) => !tricky.includes(w) && Date.parse(profile.learned[w.word]) >= week),
+          Math.min(2, n - tricky.length), byWord);
+        // The rest of the round as pickRound() fills it (mastered words rarely).
+        const fresh = pickRound(left.filter((w) => !tricky.includes(w) && !learned.includes(w)), n - tricky.length - learned.length, masteredNow());
         const short = n - tricky.length - learned.length - fresh.length;
         const topUp = short > 0 ? freshPick(spare, short, byWord, (w) => profile.streak[w.word] || 0) : [];
         return shuffle([...tricky, ...learned, ...fresh, ...topUp]).map((w) => ({ ...w, target: w.word, hidden: true }));
@@ -1507,7 +1517,7 @@
   // level it was played at), so a word's results in a level are read back from them: synced with Google, and gone
   // with Clear history. A word is mastered in that level when its last 3 spellings there were all right first try;
   // a miss takes it away until it has 3 in a row again.
-  const MASTER_RUN = 3;
+  const MASTER_RUN = 2; // test build only (live: 3)
   // { word: [right first try?, …] } in one level, oldest first, from the sessions that ended before `until` (ms).
   function resultsIn(u, level, until = Infinity) {
     const out = {};

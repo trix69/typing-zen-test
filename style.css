@@ -528,9 +528,6 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   #figMastered { grid-column: 1 / -1; } /* two tiles a row on a phone: the fifth takes the whole row */
   .kbd .key { font-size: 0.85rem; border-radius: 6px; }
   .kbd .key.named { font-size: 0.6rem; padding: 0 0 3px 4px; }
-  /* "backspace" runs off its key at this size, so the key shows ⌫ instead (user's request, 2026-11-01). */
-  .kbd .key[data-short] { font-size: 0; place-items: center; padding: 0; }
-  .kbd .key[data-short]::after { content: attr(data-short); font: 400 1.15rem var(--font-body); color: var(--fg); }
   .line { font-size: 1.7rem; }
   .line.small { font-size: 1.3rem; }
   .levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -538,6 +535,10 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 }
 /* Phones: the game title gets its own row, so Home, the clock, the live speed and sound fit on one row below it. */
 @media (max-width: 480px) {
+  /* "backspace" runs off its key on a phone (below about 455px), so the key shows ⌫ instead (user's request,
+     2026-11-01); wider, the word fits (Hermes R53.1). */
+  .kbd .key[data-short] { font-size: 0; place-items: center; padding: 0; }
+  .kbd .key[data-short]::after { content: attr(data-short); font: 400 1.15rem var(--font-body); color: var(--fg); }
   .topbar { gap: 8px; }
   .topbar .title { flex-basis: 100%; order: -1; }
   .topbar .live { margin-left: auto; font-size: 0.85rem; }
