@@ -1695,7 +1695,6 @@
         : new Date(day).toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
       const reps = practisedOn(u, day);
       const done = words.filter((w) => reps[w] >= PRACTISE_REPS), todo = words.filter((w) => !(reps[w] >= PRACTISE_REPS));
-      const n = words.length;
       const group = (cls, label, l, chip) => (l.length ? `<p class="words-label"><i class="${cls}"></i>${label} (${l.length})</p>` + chips(l.map(chip).join("")) : "");
       // The same three groups and colours as the week chart.
       return `<section class="missed-day"><h3>${name}</h3>` +
@@ -1704,8 +1703,9 @@
         group("again", tx("To practise", "Skal øves"), todo, (w) => reps[w]
           ? `<span title="${tx(`${reps[w]} of ${PRACTISE_REPS} goes done`, `${reps[w]} af ${PRACTISE_REPS} gange klaret`)}">${escapeHtml(w)} <small>${reps[w]}/${PRACTISE_REPS}</small></span>`
           : `<span>${escapeHtml(w)}</span>`) +
-        (n ? `<button type="button" class="primary small" data-day="${escapeHtml(day)}">${day === today ? tx("Practise today's " + (n === 1 ? "word" : "words"), "Øv dagens ord")
-            : n === 1 ? tx("Practise this word", "Øv dette ord") : tx("Practise these words", "Øv disse ord")}</button>` : "") +
+        // Only while some word is left to practise (Hermes R51.1): a day with every word practised asks for nothing.
+        (todo.length ? `<button type="button" class="primary small" data-day="${escapeHtml(day)}">${day === today ? tx("Practise today's " + (todo.length === 1 ? "word" : "words"), "Øv dagens ord")
+            : todo.length === 1 ? tx("Practise this word", "Øv dette ord") : tx("Practise these words", "Øv disse ord")}</button>` : "") +
         `</section>`;
     }).join("") || `<p class="note">${tx("No words from the last 7 days.", "Ingen ord fra de sidste 7 dage.")}</p>`;
     missedSheet.hidden = false;
