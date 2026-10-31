@@ -1849,9 +1849,11 @@
       Object.assign(p, FRESH(), { resetAt: r.resetAt });
       p.cloud.sentTo = r.resetAt;
     }
-    const rp = (r && r.p) || {};
+    // Cleared here since the cloud copy was saved: nothing in that copy comes back (Hermes R46.4).
+    const stale = p.resetAt && (!r || (r.resetAt || "") < p.resetAt);
+    const rp = (!stale && r && r.p) || {};
     for (const k of SYNC_MAX) p[k] = Math.max(p[k] || 0, rp[k] || 0);
-    if (r && (r.updated || "") > (p.updated || "")) {
+    if (!stale && r && (r.updated || "") > (p.updated || "")) {
       for (const k of SYNC_LATEST) if (k in rp) p[k] = rp[k];
       p.updated = r.updated;
     }
