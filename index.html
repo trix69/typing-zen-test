@@ -10,10 +10,11 @@
 <meta name="theme-color" content="#ffffff">
 <script>
 // Theme, set before the page draws so the wrong one never flashes. Saved apart from progress
-// (typingZen.v1) under typingZen.theme: "light", "dark" or "auto" (the default, follows the device).
+// (typingZen.v1) under typingZen.theme: "light" (the default since 2026-11-01, user's request), "dark" or "auto"
+// (follows the device). A device that chose one keeps it.
 (function () {
-  var root = document.documentElement, mode = "auto";
-  try { var s = localStorage.getItem("typingZen.theme"); if (s === "light" || s === "dark") mode = s; } catch (e) {}
+  var root = document.documentElement, mode = "light";
+  try { var s = localStorage.getItem("typingZen.theme"); if (s === "light" || s === "dark" || s === "auto") mode = s; } catch (e) {}
   window.THEME = {
     mode: mode,
     set: function (m) {
@@ -48,7 +49,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 </script>
 <!-- /pwa -->
-<link rel="stylesheet" href="style.css?v=5b6ecd4e69">
+<link rel="stylesheet" href="style.css?v=2af7fbfb79">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -285,7 +286,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     </div>
     <h3 id="lblStar">Like this app?</h3>
     <a class="howto-btn" id="starLink" href="https://github.com/trix69/typing-zen" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg><span>Star on GitHub</span></a>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="5b6ecd4e69">1.09-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="2af7fbfb79">1.09-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -344,9 +345,9 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <button type="button" class="sheet-done" id="missedDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=5b6ecd4e69"></script>
-<script src="words-da.js?v=5b6ecd4e69"></script>
-<script src="data.js?v=5b6ecd4e69"></script>
-<script src="app.js?v=5b6ecd4e69"></script>
+<script src="words.js?v=2af7fbfb79"></script>
+<script src="words-da.js?v=2af7fbfb79"></script>
+<script src="data.js?v=2af7fbfb79"></script>
+<script src="app.js?v=2af7fbfb79"></script>
 </body>
 </html>
