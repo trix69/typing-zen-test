@@ -1732,7 +1732,11 @@
     }
     return cloud;
   }
-  const googleName = (u) => tidyName(u.displayName || (u.email || "").split("@")[0]).slice(0, 40);
+  // At most 20 characters, as a typed name (Hermes R46.2): a longer full name becomes the first name.
+  const googleName = (u) => {
+    const n = tidyName(u.displayName || (u.email || "").split("@")[0]);
+    return (n.length > 20 ? n.split(/\s+/)[0] : n).slice(0, 20);
+  };
   const googleOf = (u) => ({ uid: u.uid, email: u.email || "" });
   let pendingGoogle = null; // signed in, with no progress saved yet: the new-user form asks only for the year
 

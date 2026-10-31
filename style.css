@@ -277,7 +277,7 @@ a.howto-btn { text-decoration: none; box-sizing: border-box; }
 .clear-confirm { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--bad); border-radius: 12px; }
 .clear-confirm p { margin: 0 0 8px; font-weight: 700; }
 /* Sign in with Google: Google's own button look (white, the four-colour G), on the new-user form and Who's typing. */
-.google-row { display: flex; flex-direction: column; gap: 8px; }
+.google-row { display: flex; flex-direction: column; gap: 6px; }
 .google-btn {
   display: inline-flex; align-items: center; gap: 10px; align-self: flex-start;
   background: #fff; color: #1f1f1f; border: 1px solid #747775; border-radius: 12px; padding: 9px 16px; font: 600 1rem var(--font-body);
@@ -285,7 +285,7 @@ a.howto-btn { text-decoration: none; box-sizing: border-box; }
 .google-btn:hover { border-color: var(--accent); }
 .google-btn:disabled { opacity: .6; cursor: progress; }
 .g-logo { width: 20px; height: 20px; flex: none; }
-.google-row .or { margin: 6px 0 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-weight: 600; }
+.google-row .or { margin: 4px 0 0; padding-top: 10px; font-size: 0.9rem; border-top: 1px solid var(--line); color: var(--muted); font-weight: 600; }
 /* A Google user's name is shown in the box but can't be edited. */
 .field input.locked { background: var(--sunk); color: var(--muted); border-style: dashed; cursor: default; }
 .link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
