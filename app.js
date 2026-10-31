@@ -1333,7 +1333,7 @@
     for (const b of $("#segYear").children) b.setAttribute("aria-checked", String(b.dataset.year === profile.year));
     for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (currentSwitch() || "off")));
     showClear(0);
-    showLogout(false);
+    showLogout(0);
     showSync();
     showLang(null);
     for (const b of $("#segLang").children) b.setAttribute("aria-checked", String(b.dataset.lang === (DA() ? "da" : "en")));
@@ -2132,10 +2132,12 @@
   // come back on signing in again). Anything not yet synced is sent first; if that fails, it says it will be lost.
   const unsynced = () => { const cs = profile.cloud || {}; return (profile.updated || "") > (cs.at || "") || profile.sessions.some((x) => x.date > (cs.sentTo || "")); };
   // Log out (a Google user) only asks to be sure: the progress stays with the Google account (user's request,
-  // 2026-11-01). Remove account (a typed name) warns: its progress lives only on this device and goes with it.
-  function showLogout(on) {
-    $("#logoutConfirm").hidden = !on;
-    if (!on) return;
+  // 2026-11-01). Remove account (a typed name) warns: its progress lives only on this device and goes with it, so
+  // it asks twice, as Clear history does (Hermes R61.2, user's "Yes", 2026-11-01). step: 0 closed, 1, 2.
+  function showLogout(step) {
+    $("#logoutConfirm").hidden = !step;
+    $("#logoutYes").dataset.step = step || 0;
+    if (!step) return;
     const n = profile.name;
     if (profile.google) {
       $("#logoutAsk").textContent = tx(
@@ -2144,18 +2146,22 @@
         (unsynced() ? " " + tx("Some progress from this device isn't saved to Google yet; it will be sent first, but if this device is offline it will be lost.",
           "Nogle fremskridt fra denne enhed er ikke gemt på Google endnu; de sendes først, men hvis enheden er offline, går de tabt.") : "");
       $("#logoutYes").textContent = tx("Log out", "Log ud");
+    } else if (step === 2) {
+      $("#logoutAsk").textContent = tx("Are you sure? This can't be undone.", "Er du sikker? Det kan ikke fortrydes.");
+      $("#logoutYes").textContent = tx(`Yes, remove ${n}`, `Ja, fjern ${n}`);
     } else {
       $("#logoutAsk").textContent = tx(
         `Remove ${n}? ${n} and all of ${n}'s progress (stars, best speed, tricky words, words to practise, mastered words and the history) will be deleted from this device. This can't be undone.`,
         `Fjern ${n}? ${n} og alle ${owner(n)} fremskridt (stjerner, bedste fart, svære ord, ord at øve, mestrede ord og historikken) slettes fra denne enhed. Det kan ikke fortrydes.`);
-      $("#logoutYes").textContent = tx(`Remove ${n}`, `Fjern ${n}`);
+      $("#logoutYes").textContent = tx("Yes, remove", "Ja, fjern");
     }
     $("#logoutYes").focus();
   }
-  $("#logoutBtn").addEventListener("click", () => { showClear(0); showLogout(true); });
-  $("#logoutNo").addEventListener("click", () => { showLogout(false); $("#logoutBtn").focus(); });
+  $("#logoutBtn").addEventListener("click", () => { showClear(0); showLogout(1); });
+  $("#logoutNo").addEventListener("click", () => { showLogout(0); $("#logoutBtn").focus(); });
   $("#logoutYes").addEventListener("click", async () => {
     const p = profile;
+    if (!p.google && $("#logoutYes").dataset.step === "1") return showLogout(2); // a typed name is asked twice
     $("#logoutYes").disabled = true;
     if (p.google && cloudOn()) {
       await Promise.race([syncNow(), new Promise((r) => setTimeout(r, 8000))]);
