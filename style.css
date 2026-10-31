@@ -508,6 +508,9 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   .kbd .row { gap: 4px; }
   .kbd .key { width: calc(var(--u) * var(--w, 1) - 4px); font-size: 0.85rem; border-radius: 6px; }
   .kbd .key.named { font-size: 0.6rem; padding: 0 0 3px 4px; }
+  /* "backspace" runs off its key at this size, so the key shows ⌫ instead (user's request, 2026-11-01). */
+  .kbd .key[data-short] { font-size: 0; place-items: center; padding: 0; }
+  .kbd .key[data-short]::after { content: attr(data-short); font: 400 1.15rem var(--font-body); color: var(--fg); }
   .line { font-size: 1.7rem; }
   .line.small { font-size: 1.3rem; }
   .levels { grid-template-columns: repeat(2, minmax(0, 1fr)); }

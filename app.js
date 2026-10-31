@@ -157,6 +157,7 @@
         k.style.setProperty("--w", width);
         k.dataset.key = id;
         k.textContent = label;
+        if (id === "backspace") k.dataset.short = "⌫"; // phones show the symbol: the word doesn't fit (user, 2026-11-01)
         el.append(k);
       }
       kbd.append(el);
