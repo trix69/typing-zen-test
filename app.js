@@ -557,8 +557,17 @@
           .slice(0, n - tricky.length);
         // A word right first try in several Spelling Bees in a row waits longer (user's request, 2026-10-28):
         // words are taken by their run of right-first-try spellings, shortest first, then the usual rotation.
-        const fresh = freshPick(left.filter((w) => !tricky.includes(w) && !learned.includes(w)), n - tricky.length - learned.length,
-          byWord, (w) => profile.streak[w.word] || 0);
+        // Mastered words wait longer still (user's request, 2026-11-01): about one round in three brings one back
+        // to check it, the one not seen for longest; otherwise they come only when the level has no other words.
+        const mastered = masteredOf(playing ? game.res : resultsIn(profile, currentBucket().name));
+        const rest = left.filter((w) => !tricky.includes(w) && !learned.includes(w));
+        const notYet = rest.filter((w) => !mastered.has(w.word)), known = rest.filter((w) => mastered.has(w.word));
+        let need = n - tricky.length - learned.length;
+        const check = need > 0 && known.length && Math.random() < 1 / 3 ? freshPick(known, 1, byWord) : [];
+        need -= check.length;
+        const streakFirst = (w) => profile.streak[w.word] || 0;
+        const fresh = [...check, ...freshPick(notYet, need, byWord, streakFirst)];
+        if (fresh.length - check.length < need) fresh.push(...freshPick(known.filter((w) => !check.includes(w)), need - fresh.length + check.length, byWord, streakFirst));
         const short = n - tricky.length - learned.length - fresh.length;
         const topUp = short > 0 ? freshPick(spare, short, byWord, (w) => profile.streak[w.word] || 0) : [];
         return shuffle([...tricky, ...learned, ...fresh, ...topUp]).map((w) => ({ ...w, target: w.word, hidden: true }));
@@ -596,7 +605,8 @@
     loadSwitch(currentSwitch()); // fetch the key sounds now (a click), so the first key isn't silent
     const items = buildItems(mode);
     if (!items.length) return;
-    game = { mode, length, items, batch: 0, missedIn: {}, idx: 0, correct: 0, errors: 0, ms: 0, missed: new Set(), firstTry: [], struggled: [], over: false };
+    game = { mode, length, items, batch: 0, missedIn: {}, idx: 0, correct: 0, errors: 0, ms: 0, missed: new Set(), firstTry: [], struggled: [], over: false,
+      res: mode === "spell" ? resultsIn(profile, currentBucket().name) : {}, newMastered: new Set() };
     game.minutes = mode === "spell" ? LENGTHS[length] || LENGTHS.long : 0;
     if (game.minutes) game.endsAt = Date.now() + game.minutes * 60000;
     $("#modeTitle").textContent = tx(...TITLES[mode]);
@@ -849,6 +859,11 @@
     }
     if (game.mode === "spell") {
       delete profile.learned[it.word]; // spelled from memory: no longer waiting
+      // Mastery in this level, kept up as the session goes: a word reaching 3 right first try in a row is new.
+      const r = game.res[it.word] = game.res[it.word] || [], was = isMastered(r);
+      r.push(!missed);
+      if (!was && isMastered(r)) game.newMastered.add(it.word);
+      else if (was && !isMastered(r)) game.newMastered.delete(it.word);
       // The run of right-first-try spellings: one more, or back to 0 after a miss.
       if (missed) delete profile.streak[it.word];
       else profile.streak[it.word] = (profile.streak[it.word] || 0) + 1;
@@ -969,13 +984,24 @@
     $("#resWpm").textContent = speed;
     $("#resAcc").textContent = done ? acc + "%" : "–"; // nothing typed: no accuracy to claim
     $("#resItems").textContent = game.items.length;
-    $("#resFirst").textContent = game.firstTry.length;
+    // Spelling Bee shows three groups (user's request, 2026-11-01): new words mastered, the other words right first
+    // try, and the words that need more practice, as figures and as word lists. A word missed and later spelled
+    // right in the same session is only in the last group.
+    const masteredNow = [...game.newMastered];
+    const rightOnly = [...new Set(game.firstTry)].filter((w) => !game.newMastered.has(w) && !game.missed.has(w));
+    $("#resFirst").textContent = game.mode === "spell" ? game.firstTry.length - game.firstTry.filter((w) => game.newMastered.has(w)).length : game.firstTry.length;
     $("#resStruggled").textContent = game.struggled.length;
     for (const id of ["#figFirst", "#figStruggled"]) $(id).hidden = !game.endsAt;
+    // Spelling Bee: the words mastered in this session (user's request, 2026-11-01).
+    $("#figMastered").hidden = game.mode !== "spell";
+    $("#resMastered").textContent = game.newMastered.size;
     $("#figItems").hidden = !!game.endsAt;
-    $("#resTricky").innerHTML = game.missed.size
-      ? `<div class="label">${tx("Words to practise again", "Ord at øve igen")}</div><div class="tricky-list">${[...game.missed].map((w) => `<span>${escapeHtml(w)}</span>`).join("")}</div>`
-      : "";
+    const list = (label, cls, words, mark = "") => (words.length
+      ? `<div class="label">${label}</div><div class="tricky-list ${cls}">${words.map((w) => `<span>${mark}${escapeHtml(w)}</span>`).join("")}</div>` : "");
+    $("#resTricky").innerHTML = game.mode === "spell"
+      ? list(tx("New words mastered", "Nye ord mestret"), "mastered", masteredNow, "★ ") + list(tx("Right first try", "Rigtigt i første forsøg"), "right", rightOnly) +
+        list(tx("Needs more practice", "Skal øves mere"), "again", [...game.missed])
+      : list(tx("Words to practise again", "Ord at øve igen"), "", [...game.missed]);
     show("results");
   }
 
@@ -999,6 +1025,11 @@
     for (const b of document.querySelectorAll(".level")) {
       b.disabled = !open.includes(b.dataset.bucket);
       b.setAttribute("aria-checked", String(b.dataset.bucket === currentBucket().name));
+      // "– 12% mastered" once more than 1% of that year's words are mastered (user's request, 2026-11-01).
+      const lv = BUCKETS.find((x) => x.name === b.dataset.bucket);
+      const share = lv.words.length ? (masteredOf(resultsIn(profile, lv.name)).size / lv.words.length) * 100 : 0;
+      b.querySelector("b").innerHTML = escapeHtml(lv.label) +
+        (share > 1 ? ` <small class="mastery">– ${Math.round(share)}% ${tx("mastered", "mestret")}</small>` : "");
     }
     const parts = [];
     if (profile.rounds) parts.push(`⭐ ${profile.stars} ${tx("stars", "stjerner")}`, `🏃 ${tx("best", "bedst")} ${profile.bestWpm} ${tx("wpm", "ord/min")}`,
@@ -1472,6 +1503,27 @@
     }
     return days;
   }
+  // Mastered words (user's request, 2026-11-01). Every Spelling Bee result is in the saved sessions (with the
+  // level it was played at), so a word's results in a level are read back from them: synced with Google, and gone
+  // with Clear history. A word is mastered in that level when its last 3 spellings there were all right first try;
+  // a miss takes it away until it has 3 in a row again.
+  const MASTER_RUN = 3;
+  // { word: [right first try?, …] } in one level, oldest first, from the sessions that ended before `until` (ms).
+  function resultsIn(u, level, until = Infinity) {
+    const out = {};
+    const list = (u.sessions || []).filter((s) => s && s.game === "spell" && s.level === level && Date.parse(s.date) < until)
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    for (const s of list) {
+      // Within a session a word missed and then spelled right again later was missed first.
+      for (const w of Array.isArray(s.struggledWords) ? s.struggledWords : []) (out[w] = out[w] || []).push(false);
+      for (const w of Array.isArray(s.firstTryWords) ? s.firstTryWords : []) (out[w] = out[w] || []).push(true);
+    }
+    return out;
+  }
+  const isMastered = (r) => !!r && r.length >= MASTER_RUN && r.slice(-MASTER_RUN).every(Boolean);
+  const masteredOf = (res) => new Set(Object.keys(res).filter((w) => isMastered(res[w])));
+  const levelOf = (u) => BUCKETS.find((b) => b.name === u.bucket && unlocked(u.year || "Y1").includes(b.name)) || BUCKETS.find((b) => b.name === u.year) || BUCKETS[0];
+
   // The words that weren't right first try, per local day of the last 7 (newest day first), each word once.
   function missedByDay(u) {
     const from = new Date();
@@ -1549,6 +1601,7 @@
     }
     const week = days.reduce((a, x) => ({ words: a.words + x.words, first: a.first + x.first }), { words: 0, first: 0 });
     $("#weekLine").innerHTML = week.words ? `${tx("Last 7 days", "De sidste 7 dage")}: ${wordsAndRate(week)}` : tx("Last 7 days: no words yet.", "De sidste 7 dage: ingen ord endnu.");
+    renderMastery(u, days);
     const chart = $("#weekChart");
     chart.hidden = !week.words;
     $("#weekKey").hidden = !week.words;
@@ -1570,6 +1623,38 @@
         `<span class="bar">${part("again", again)}${part("practised", done)}${part("first", x.first)}</span>` +
         `<span class="d">${name}</span><span class="r">${rate}</span></li>`;
     }).join("");
+  }
+
+  // Mastered words over the last 7 days, as a line under the bars (user's request, 2026-11-01): each day's point is
+  // the share of the level's words mastered by the end of that day. One series, so no legend: the line above names
+  // it. The scale's top is a round number just above the highest point, so small gains still show.
+  function renderMastery(u, days) {
+    const level = levelOf(u), total = level.words.length;
+    const ever = Object.keys(resultsIn(u, level.name)).length;
+    $("#masterLine").hidden = $("#masterChart").hidden = !ever || !total;
+    if (!ever || !total) return;
+    const counts = days.map(({ d }) => {
+      const end = new Date(d);
+      end.setHours(24, 0, 0, 0);
+      return masteredOf(resultsIn(u, level.name, end.getTime())).size;
+    });
+    const pct = (n) => Math.round((n / total) * 100);
+    const now = counts[6], gain = now - counts[0];
+    $("#masterLine").innerHTML = tx(`Mastered: <b>${pct(now)}%</b> of ${level.label} words (${now} of ${total})`,
+      `Mestret: <b>${pct(now)}%</b> af ordene i ${level.label} (${now} af ${total})`) +
+      (gain > 0 ? tx(` · <b>+${gain}</b> this week`, ` · <b>+${gain}</b> denne uge`) : "");
+    const top = [5, 10, 20, 25, 50, 100].find((t) => t >= Math.max(...counts.map(pct))) || 100;
+    const pts = counts.map((n, i) => [((i + 0.5) / 7) * 100, 100 - ((n / total) * 100 / top) * 100]);
+    $("#masterChart").innerHTML =
+      `<span class="grid-top">${top}%</span>` +
+      `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="0" x2="100" y2="0" class="grid"/><line x1="0" y1="100" x2="100" y2="100" class="base"/>` +
+      `<polyline points="${pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(" ")}"/></svg>` +
+      counts.map((n, i) => {
+        const full = days[i].d.toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
+        const said = tx(`${full}: ${pct(n)}% mastered (${n} words)`, `${full}: ${pct(n)}% mestret (${n} ord)`);
+        return `<span class="pt" style="left:${pts[i][0]}%;top:${pts[i][1]}%" title="${said}" role="img" aria-label="${said}"><i></i>` +
+          (i === 6 ? `<b>${pct(n)}%</b>` : "") + `</span>`;
+      }).join("");
   }
 
   // ---------- Who's typing: welcome, new user, switch user ----------

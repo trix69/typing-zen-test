@@ -128,6 +128,9 @@ kbd {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .screen { display: flex; flex-direction: column; gap: 24px; }
+/* The welcome screen is one centred column as wide as its card, so the title and the Settings gear sit over the
+   card on wide screens instead of across the whole page (user's request, 2026-11-01). */
+#welcome { width: 100%; max-width: 560px; margin-inline: auto; }
 
 /* Home */
 .brand { display: flex; align-items: center; gap: 16px; }
@@ -230,6 +233,18 @@ kbd {
 .week-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; font: 500 0.75rem var(--font-mono); color: var(--muted); }
 .week-key span { display: inline-flex; align-items: center; gap: 6px; }
 .week-key i { width: 10px; height: 10px; border-radius: 3px; }
+/* Mastered words, last 7 days: one line in the same 7 columns as the bars; the value is labelled only at today. */
+.master-chart { position: relative; height: 64px; margin: 4px 0 6px; }
+.master-chart svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.master-chart polyline { fill: none; stroke: var(--bar-first); stroke-width: 2px; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.master-chart .grid { stroke: var(--line); stroke-width: 1px; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.master-chart .base { stroke: var(--line); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.master-chart .grid-top { position: absolute; left: 0; top: -0.6em; padding-right: 4px; background: var(--panel); font: 500 0.7rem var(--font-mono); color: var(--muted); }
+.master-chart .pt { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; display: grid; place-items: center; }
+.master-chart .pt i { width: 8px; height: 8px; border-radius: 50%; background: var(--bar-first); box-shadow: 0 0 0 2px var(--panel); }
+.master-chart .pt b { position: absolute; bottom: 100%; font: 600 0.75rem var(--font-mono); color: var(--fg); white-space: nowrap; }
+.tricky-list.mastered span { border-color: var(--bar-first); }
+.tricky-list.again span { border-color: var(--koi); }
 .week-chart .d { font: 500 0.75rem var(--font-mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .week-chart .r { font: 500 0.75rem var(--font-mono); color: var(--fg); font-variant-numeric: tabular-nums; }
 /* The colour key and Words to practise share a row, so welcome back still fits a phone on its side. */
@@ -253,6 +268,7 @@ kbd {
    without scrolling (Hermes R8.1), also with the Words to practise row under the chart. */
 @media (max-height: 420px) {
   .week-chart .bar { height: 30px; }
+  .master-chart { height: 30px; }
   .week-chart li { gap: 2px; }
   .week { gap: 6px; }
   .app { padding-top: 12px; }
@@ -262,6 +278,7 @@ kbd {
 @media (max-height: 340px) {
   .brand .tag { display: none; }
   .week-chart .bar { height: 20px; }
+  .master-chart { height: 22px; }
 }
 .user-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
 .user-list .user { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; text-align: left; }
@@ -317,6 +334,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .level:disabled { opacity: .45; filter: grayscale(1); cursor: not-allowed; }
 .level b { font: 700 1.25rem var(--font-display); letter-spacing: -0.01em; }
 .level span { font-size: 0.85rem; color: var(--muted); }
+.level .mastery { font: 600 0.8rem var(--font-body); color: var(--accent); letter-spacing: 0; white-space: nowrap; }
 .level[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
 .card .why { font-size: 0.95rem; color: var(--koi); font-weight: 700; }
 
@@ -452,6 +470,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .stars { font-size: 3rem; letter-spacing: 0.15em; }
 .stars .off { filter: grayscale(1); opacity: .25; }
 .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; width: 100%; max-width: 620px; }
+#resTricky .tricky-list + .label { margin-top: 14px; }
 .figures div { display: flex; flex-direction: column; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 8px; }
 .figures b { font: 700 2rem var(--font-display); font-variant-numeric: tabular-nums; color: var(--accent); }
 #resStruggled { color: var(--koi); } /* "needed another try" stands apart from the green "right first try" */
@@ -506,6 +525,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 /* Smaller screens: shrink the keyboard so it never forces sideways scroll. */
 @media (max-width: 760px) {
   .kbd { --kh: 38px; --g: 4px; }
+  #figMastered { grid-column: 1 / -1; } /* two tiles a row on a phone: the fifth takes the whole row */
   .kbd .key { font-size: 0.85rem; border-radius: 6px; }
   .kbd .key.named { font-size: 0.6rem; padding: 0 0 3px 4px; }
   /* "backspace" runs off its key at this size, so the key shows ⌫ instead (user's request, 2026-11-01). */
