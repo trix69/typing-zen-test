@@ -1843,7 +1843,7 @@
     start("practise");
   });
   $("#switchBtn").addEventListener("click", () => showPanel("switch"));
-  $("#newBtn").addEventListener("click", () => showPanel("new"));
+  // No "I'm new here" on Welcome back (user's request, 2026-11-01): a new user starts from Switch user.
   $("#switchNew").addEventListener("click", () => showPanel("new"));
   $("#switchBack").addEventListener("click", () => showWelcome());
   $("#userList").addEventListener("click", (e) => { const b = e.target.closest(".user"); if (b) useProfile(b.dataset.id); });
@@ -1865,16 +1865,43 @@
   const CLOUD = "typingZen.users-test"; // the Firestore collection; the test build uses its own (deploy_test.py)
   const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/10.12.2/firebase-";
   const cloudOn = () => !!FIREBASE && window.top === window;
-  let cloud = null; // Promise of { auth, db, au, fs }, once the SDK has loaded and knows who is signed in
-  function loadCloud() {
-    if (!cloud) {
-      cloud = Promise.all(["app", "auth", "firestore"].map((n) => import(`${FIREBASE_SDK}${n}.js`))).then(([app, au, fs]) => {
-        const a = app.initializeApp(FIREBASE), auth = au.getAuth(a);
+  // Each Google user keeps their own sign-in on the device (user's request, 2026-11-01): one Firebase app per
+  // user, named after their account, so signing in as someone else never signs them out. Signing in happens on
+  // the default app, and the account then moves to its own (keepSignIn). Builds before this kept everyone on the
+  // default app; userCloud() moves such a sign-in across the first time it's needed.
+  let sdk = null; // Promise of [app, auth, firestore] modules
+  const clouds = {}; // app name -> Promise of { auth, db, au, fs }, once that app knows who is signed in
+  function cloudFor(name) {
+    if (!sdk) {
+      sdk = Promise.all(["app", "auth", "firestore"].map((n) => import(`${FIREBASE_SDK}${n}.js`)));
+      sdk.catch(() => { sdk = null; }); // offline: try again next time
+    }
+    if (!clouds[name]) {
+      clouds[name] = sdk.then(([app, au, fs]) => {
+        const a = name === "[DEFAULT]" ? app.initializeApp(FIREBASE) : app.initializeApp(FIREBASE, name), auth = au.getAuth(a);
         return new Promise((done) => { const off = au.onAuthStateChanged(auth, () => { off(); done({ auth, db: fs.getFirestore(a), au, fs }); }); });
       });
-      cloud.catch(() => { cloud = null; }); // offline: try again next time
+      clouds[name].catch(() => { delete clouds[name]; });
     }
-    return cloud;
+    return clouds[name];
+  }
+  const loadCloud = () => cloudFor("[DEFAULT]");
+  const appOf = (uid) => "u-" + uid;
+  // The signed-in account u (on the default app) moves to its own app, and the default app is left signed out.
+  async function keepSignIn(u) {
+    const [mine, front] = await Promise.all([cloudFor(appOf(u.uid)), loadCloud()]);
+    await mine.au.updateCurrentUser(mine.auth, u);
+    if (front.auth.currentUser) await front.au.signOut(front.auth);
+    return mine;
+  }
+  // A Google user's own app, with their sign-in moved over from the default app if an older build left it there.
+  async function userCloud(uid) {
+    const mine = await cloudFor(appOf(uid));
+    if (!mine.auth.currentUser) {
+      const front = await loadCloud();
+      if (front.auth.currentUser && front.auth.currentUser.uid === uid) return keepSignIn(front.auth.currentUser);
+    }
+    return mine;
   }
   // At most 20 characters, as a typed name (Hermes R46.2): a longer full name becomes the first name.
   const googleName = (u) => {
@@ -1945,9 +1972,9 @@
     btn.disabled = true;
     try {
       const u = await (back || signInGoogle("start"));
+      const c = await keepSignIn(u);
       const mine = users().find((x) => x.google && x.google.uid === u.uid);
       if (mine) { mine.name = googleName(u); return useProfile(mine.id); }
-      const c = await loadCloud();
       const snap = await c.fs.getDoc(c.fs.doc(c.db, CLOUD, u.uid));
       if (snap.exists()) {
         const r = snap.data(), id = newId();
@@ -2020,7 +2047,7 @@
     cs.state = "busy";
     showSync();
     syncing = (async () => {
-      const c = await loadCloud(), { fs } = c;
+      const c = await userCloud(p.google.uid), { fs } = c;
       if (!c.auth.currentUser || c.auth.currentUser.uid !== p.google.uid) { cs.state = "out"; return; }
       const ref = fs.doc(c.db, CLOUD, p.google.uid), col = fs.collection(ref, "sessions");
       const sentTo = cs.sentTo || "", mine = p.sessions.filter((x) => x.date > sentTo); // made here since the last sync
@@ -2066,11 +2093,13 @@
   document.addEventListener("visibilitychange", () => syncNow());
   window.addEventListener("online", () => syncNow());
 
-  // Settings for a Google user: how the sync is going, and Log out.
+  // Settings for a Google user: how the sync is going, and Log out. A typed-name user gets Remove account in its
+  // place (user's request, 2026-11-01).
   function showSync() {
     const g = chosen && profile.google && cloudOn();
     $("#syncRow").hidden = !g;
-    $("#logoutBtn").hidden = !g;
+    $("#logoutBtn").hidden = !chosen;
+    $("#logoutBtn").textContent = profile.google ? tx("Log out", "Log ud") : tx("Remove account", "Fjern konto");
     if (!g) return;
     const cs = profile.cloud || {}, email = profile.google.email;
     const at = cs.at ? new Date(cs.at).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }) : "";
@@ -2091,6 +2120,7 @@
           `Det er en anden Google-konto (${u.email}). Log ind som ${profile.google.email}.`);
         return;
       }
+      await keepSignIn(u);
       await syncNow();
     } catch (e) {
       const m = signInError(e);
@@ -2101,16 +2131,25 @@
   // Log out warns first: this user and their history leave this device (they stay with the Google account and
   // come back on signing in again). Anything not yet synced is sent first; if that fails, it says it will be lost.
   const unsynced = () => { const cs = profile.cloud || {}; return (profile.updated || "") > (cs.at || "") || profile.sessions.some((x) => x.date > (cs.sentTo || "")); };
+  // Log out (a Google user) only asks to be sure: the progress stays with the Google account (user's request,
+  // 2026-11-01). Remove account (a typed name) warns: its progress lives only on this device and goes with it.
   function showLogout(on) {
     $("#logoutConfirm").hidden = !on;
     if (!on) return;
     const n = profile.name;
-    $("#logoutAsk").textContent = tx(
-      `Log ${n} out? ${n} and all of ${n}'s history (stars, best speed, tricky words, words to practise and the last 7 days) will be removed from this device. It stays saved with the Google account and comes back when ${n} signs in with Google again.`,
-      `Log ${n} ud? ${n} og hele ${owner(n)} historik (stjerner, bedste fart, svære ord, ord at øve og de sidste 7 dage) fjernes fra denne enhed. Den forbliver gemt på Google-kontoen og kommer tilbage, når ${n} logger ind med Google igen.`) +
-      (unsynced() ? " " + tx("Some progress from this device isn't saved to Google yet; it will be sent first, but if this device is offline it will be lost.",
-        "Nogle fremskridt fra denne enhed er ikke gemt på Google endnu; de sendes først, men hvis enheden er offline, går de tabt.") : "");
-    $("#logoutYes").textContent = tx("Log out", "Log ud");
+    if (profile.google) {
+      $("#logoutAsk").textContent = tx(
+        `Are you sure you want to log out? ${n}'s progress is still saved, and carries on from whichever device ${n} signs in on next.`,
+        `Er du sikker på, at du vil logge ud? ${owner(n)} fremskridt er stadig gemt og fortsætter på den enhed, ${n} logger ind på næste gang.`) +
+        (unsynced() ? " " + tx("Some progress from this device isn't saved to Google yet; it will be sent first, but if this device is offline it will be lost.",
+          "Nogle fremskridt fra denne enhed er ikke gemt på Google endnu; de sendes først, men hvis enheden er offline, går de tabt.") : "");
+      $("#logoutYes").textContent = tx("Log out", "Log ud");
+    } else {
+      $("#logoutAsk").textContent = tx(
+        `Remove ${n}? ${n} and all of ${n}'s progress (stars, best speed, tricky words, words to practise, mastered words and the history) will be deleted from this device. This can't be undone.`,
+        `Fjern ${n}? ${n} og alle ${owner(n)} fremskridt (stjerner, bedste fart, svære ord, ord at øve, mestrede ord og historikken) slettes fra denne enhed. Det kan ikke fortrydes.`);
+      $("#logoutYes").textContent = tx(`Remove ${n}`, `Fjern ${n}`);
+    }
     $("#logoutYes").focus();
   }
   $("#logoutBtn").addEventListener("click", () => { showClear(0); showLogout(true); });
@@ -2118,11 +2157,13 @@
   $("#logoutYes").addEventListener("click", async () => {
     const p = profile;
     $("#logoutYes").disabled = true;
-    await Promise.race([syncNow(), new Promise((r) => setTimeout(r, 8000))]);
-    try {
-      const c = await Promise.race([loadCloud(), new Promise((r) => setTimeout(r, 3000))]);
-      if (c && c.auth.currentUser && c.auth.currentUser.uid === p.google.uid) await c.au.signOut(c.auth);
-    } catch { /* offline: the account is forgotten here anyway */ }
+    if (p.google && cloudOn()) {
+      await Promise.race([syncNow(), new Promise((r) => setTimeout(r, 8000))]);
+      try {
+        const c = await Promise.race([userCloud(p.google.uid), new Promise((r) => setTimeout(r, 3000))]);
+        if (c && c.auth.currentUser && c.auth.currentUser.uid === p.google.uid) await c.au.signOut(c.auth); // only this user
+      } catch { /* offline: the account is forgotten here anyway */ }
+    }
     $("#logoutYes").disabled = false;
     delete store.users[p.id];
     chosen = false;
