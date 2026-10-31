@@ -562,7 +562,6 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   #play .kbd .key { font-size: calc(var(--kh) * 0.42); border-radius: calc(var(--kh) * 0.2); }
   #play .kbd .key.named { font-size: calc(var(--kh) * 0.26); padding: 0 0 calc(var(--kh) * 0.12) calc(var(--kh) * 0.2); }
 }
-}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
