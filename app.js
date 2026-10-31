@@ -1199,7 +1199,8 @@
   });
   $("#lenCancel").addEventListener("click", () => { closeLength(); $('.mode[data-mode="spell"]').focus(); });
   lenSheet.addEventListener("click", (e) => { if (e.target === lenSheet) closeLength(); });
-  // Use offline (user's request, 2026-10-28, the same design as Violin Toolkit's): a button in Settings opens
+  // Add to Home Screen (user's request, 2026-10-28, the same design as Violin Toolkit's; called Use offline until
+  // Google sign-in, which needs the internet, 2026-10-31): a button in Settings opens
   // steps for iPhone / iPad, Android and Mac / PC, starting on this device's. Hidden when Typing Zen already runs
   // from the home screen, or inside another page (the claude.ai copy), where it can't be added.
   const howto = $("#howto");
@@ -1761,7 +1762,36 @@
     $("#googleNewRow").hidden = !!u || !cloudOn();
     if (u) $("#googleAsText").textContent = tx(`Your name comes from your Google account (${u.email}).`, `Dit navn kommer fra din Google-konto (${u.email}).`);
   }
-  async function signInGoogle() {
+  // From the home screen (iOS), the Google window can't open, so the app goes to Google's sign-in page itself and
+  // Google sends it back with an ID token in the address (user's report, 2026-10-31); the browser keeps the window.
+  // GOOGLE_CLIENT is the project's OAuth client (public); its Authorized redirect URIs list both sites' addresses.
+  const GOOGLE_CLIENT = "264177378932-18e7s9sn645bslvufmr48gkk75c0lib9.apps.googleusercontent.com";
+  const GOOGLE_BACK = "typingZen.google-test"; // { state, nonce, why }, while the app is away at Google
+  const homeApp = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const backTo = () => location.origin + location.pathname.replace(/index\.html$/, "");
+  function signInByPage(why) {
+    const rnd = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+    const go = { state: rnd(), nonce: rnd(), why };
+    localStorage.setItem(GOOGLE_BACK, JSON.stringify(go));
+    location.assign("https://accounts.google.com/o/oauth2/v2/auth?" + new URLSearchParams({ client_id: GOOGLE_CLIENT,
+      redirect_uri: backTo(), response_type: "id_token", scope: "openid email profile", prompt: "select_account", state: go.state, nonce: go.nonce }));
+    return new Promise(() => {}); // the page is leaving
+  }
+  // Back from Google: the token (or nothing, if they cancelled) is taken out of the address at once.
+  function cameBack() {
+    const h = new URLSearchParams(location.hash.slice(1));
+    if (!h.has("state")) return null;
+    let go = null;
+    try { go = JSON.parse(localStorage.getItem(GOOGLE_BACK)); } catch {}
+    if (!go || go.state !== h.get("state")) return null;
+    localStorage.removeItem(GOOGLE_BACK);
+    history.replaceState(null, "", location.pathname + location.search);
+    const token = h.get("id_token");
+    if (!token) return { why: go.why, user: Promise.reject({ code: "popup-closed-by-user" }) };
+    return { why: go.why, user: loadCloud().then((c) => c.au.signInWithCredential(c.auth, c.au.GoogleAuthProvider.credential(token))).then((r) => r.user) };
+  }
+  async function signInGoogle(why) {
+    if (homeApp()) return signInByPage(why);
     const c = await loadCloud();
     const provider = new c.au.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
@@ -1776,11 +1806,11 @@
   };
   // From the new-user form or Who's typing: a Google account already on this device opens its user; one with
   // progress saved from another device becomes a user here; a new one fills in the form's name.
-  async function googleStart(btn) {
+  async function googleStart(btn, back) {
     setError("google", "");
     btn.disabled = true;
     try {
-      const u = await signInGoogle();
+      const u = await (back || signInGoogle("start"));
       const mine = users().find((x) => x.google && x.google.uid === u.uid);
       if (mine) { mine.name = googleName(u); return useProfile(mine.id); }
       const c = await loadCloud();
@@ -1917,9 +1947,9 @@
       : tx(`Signed in with Google (${email}).`, `Logget ind med Google (${email}).`));
     $("#syncSignIn").hidden = cs.state !== "out";
   }
-  $("#syncSignIn").addEventListener("click", async () => {
+  async function syncSignIn(back) {
     try {
-      const u = await signInGoogle();
+      const u = await (back || signInGoogle("sync"));
       if (u.uid !== profile.google.uid) {
         $("#syncNote").textContent = tx(`That's a different Google account (${u.email}). Sign in as ${profile.google.email}.`,
           `Det er en anden Google-konto (${u.email}). Log ind som ${profile.google.email}.`);
@@ -1930,7 +1960,8 @@
       const m = signInError(e);
       if (m) $("#syncNote").textContent = m;
     }
-  });
+  }
+  $("#syncSignIn").addEventListener("click", () => syncSignIn());
   // Log out warns first: this user and their history leave this device (they stay with the Google account and
   // come back on signing in again). Anything not yet synced is sent first; if that fails, it says it will be lost.
   const unsynced = () => { const cs = profile.cloud || {}; return (profile.updated || "") > (cs.at || "") || profile.sessions.some((x) => x.date > (cs.sentTo || "")); };
@@ -2053,4 +2084,7 @@
 
   applyLang();
   showWelcome();
+  const back = cloudOn() && cameBack();
+  if (back && back.why === "sync") syncSignIn(back.user);
+  else if (back) googleStart(users().length ? $("#googleSwitch") : $("#googleNew"), back.user);
 })();
