@@ -245,6 +245,7 @@
     if (muted()) return;
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state !== "running") audio.resume(); // see keySound()
       const o = audio.createOscillator(), g = audio.createGain();
       o.type = type; o.frequency.value = freq;
       g.gain.setValueAtTime(vol, audio.currentTime);
@@ -294,7 +295,9 @@
     const buf = bufs && bufs[name];
     if (!buf) return; // still loading
     try {
-      if (audio.state === "suspended") audio.resume();
+      // Safari also has "interrupted" (another sound, such as the spoken word, took over on iPhone/iPad):
+      // resume from anything but running, or every key stays silent after the first word is read.
+      if (audio.state !== "running") audio.resume();
       const src = audio.createBufferSource(), g = audio.createGain();
       src.buffer = buf;
       g.gain.value = 0.8;
@@ -1086,7 +1089,7 @@
       lines.push(`${((performance.now() - t0) / 1000).toFixed(2)} ${e.type} key=${JSON.stringify(e.key ?? e.data ?? "")}` +
         (e.code ? ` code=${e.code}` : "") + (e.keyCode ? ` kc=${e.keyCode}` : "") + (e.repeat ? " repeat" : "") +
         (e.isComposing ? " composing" : "") + (e.inputType ? ` ${e.inputType}` : "") + (e.isTrusted ? "" : " synthetic") +
-        ` on=${el(e.target)} focus=${el(document.activeElement)}${g}` + (navigator.audioSession ? ` audio=${navigator.audioSession.type}` : ""));
+        ` on=${el(e.target)} focus=${el(document.activeElement)}${g}` + (navigator.audioSession ? ` audio=${navigator.audioSession.type}` : "") + (audio ? ` ctx=${audio.state}` : ""));
       if (lines.length > 24) lines.shift();
       box.textContent = lines.join("\n");
     };
