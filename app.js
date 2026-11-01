@@ -414,7 +414,9 @@
   const muted = () => profile.mute && !(game && game.mode === "spell" && !$("#play").hidden) && $("#sheet").hidden;
   let speechRun = 0;
   let speakTimer = 0; // the short wait before a new item is spoken; cleared by stopSpeech()
-  function speak(...texts) {
+  // texts are said one after another with a 1 s gap; sayThenSpell() uses a shorter one.
+  const speak = (...texts) => speakGap(1000, ...texts);
+  function speakGap(gap, ...texts) {
     const run = ++speechRun;
     if (muted() || !("speechSynthesis" in window)) return;
     speechSynthesis.cancel();
@@ -425,15 +427,18 @@
       if (voice) u.voice = voice;
       u.lang = voice ? voice.lang : tx("en-GB", "da-DK");
       u.rate = 0.85;
-      u.onend = () => setTimeout(() => say(i + 1), 1000);
+      u.onend = () => setTimeout(() => say(i + 1), gap);
       speechSynthesis.speak(u);
     };
     say(0);
   }
-  // A word letter by letter, for Practice (user's request, 2026-11-01): "joyfully" → "J, O, Y, F, U, L, L, Y".
-  // Capitals, so voices say each letter's name; an apostrophe or hyphen is said by name.
+  // A word letter by letter, for Practice (user's request, 2026-11-01): "joyfully" → "J O Y F U L L Y".
+  // Capitals, so voices say each letter's name; an apostrophe or hyphen is said by name. Spaces, not commas,
+  // between them, so the letters come without a pause between each (user's request, 2026-11-01).
   const spelledOut = (w) => [...w].map((c) => (c === "'" ? tx("apostrophe", "apostrof") : c === "-" ? tx("hyphen", "bindestreg")
-    : c === " " ? tx("space", "mellemrum") : c.toUpperCase())).join(", ");
+    : c === " " ? tx("space", "mellemrum") : c.toUpperCase())).join(" ");
+  // Practice: the word, then its spelling 0.3 s later (user's request, 2026-11-01: a shorter pause than 1 s).
+  const sayThenSpell = (w) => speakGap(300, w, spelledOut(w));
   const stopSpeech = () => { clearTimeout(speakTimer); speechRun++; if ("speechSynthesis" in window) speechSynthesis.cancel(); };
 
   // ---------- Building a round ----------
@@ -708,7 +713,7 @@
       // requests, 2026-11-01); a clean go is followed by the next go in silence.
       it.spoken = true;
       it.sayAgain = false;
-      speakTimer = setTimeout(() => speak(it.word, spelledOut(it.word)), 250);
+      speakTimer = setTimeout(() => sayThenSpell(it.word), 250);
     }
     else if (game.mode === "words") speakTimer = setTimeout(() => speak(it.word), 250);
     else if (game.mode === "sentences") speakTimer = setTimeout(() => speak(it.sentence), 250);
@@ -1501,7 +1506,7 @@
     const b = e.target.closest("button");
     if (!b || !game) return;
     const it = game.items[game.idx];
-    if (b.dataset.say === "word") game.mode === "practise" ? speak(it.word, spelledOut(it.word)) : speak(it.word);
+    if (b.dataset.say === "word") game.mode === "practise" ? sayThenSpell(it.word) : speak(it.word);
     if (b.dataset.say === "sentence") speak(it.sentence);
     if ("hint" in b.dataset) $("#msg").innerHTML = `💡 <span class="rule">${escapeHtml(it.rule)}</span>`;
     b.blur();
