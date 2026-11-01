@@ -1597,10 +1597,10 @@
     const v = (u.practised || {})[day];
     return Array.isArray(v) ? Object.fromEntries(v.map((w) => [w, PRACTISE_REPS])) : { ...v };
   }
-  // exact: set the count as given (a slip sets it to 0); otherwise it only goes up.
-  function savePractice(day, word, reps, exact = false) {
+  // A word's count only goes up: a slip in Practice isn't counted but takes nothing away (R63).
+  function savePractice(day, word, reps) {
     const d = practisedOn(profile, day);
-    d[word] = exact ? reps : Math.max(d[word] || 0, reps);
+    d[word] = Math.max(d[word] || 0, reps);
     if (!d[word]) delete d[word];
     profile.practised[day] = d;
     const from = new Date();
