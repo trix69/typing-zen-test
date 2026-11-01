@@ -1069,11 +1069,17 @@
     const tricky = Object.keys(profile.tricky).length;
     // Sentence Stream, Fix-It and Tricky Words are hidden on home (user's request, 2026-10-28); their code stays.
     // Practice: today's words that weren't right first try. Other days are chosen in View stats.
-    const todays = (missedByDay(profile)[new Date().toDateString()] || []).length;
-    $("#practiseBtn").disabled = !todays;
+    // Greyed out once every word missed today has its 5 goes (user's request, 2026-11-01); other days' words are
+    // practised from View stats.
+    const today = new Date().toDateString(), missedToday = missedByDay(profile)[today] || [];
+    const todays = missedToday.length, done = practisedOn(profile, today);
+    const left = missedToday.filter((w) => !(done[w] >= PRACTISE_REPS)).length;
+    $("#practiseBtn").disabled = !left;
     // Cards show state only, no instructions (UX-PRINCIPLES.md, Hermes UX.1 and UX.6).
-    $("#practiseInfo").textContent = todays ? tx(`${todays} word${todays === 1 ? "" : "s"} today, ${PRACTISE_REPS} times each`,
-      `${todays} ord i dag, ${PRACTISE_REPS} gange hver`) : tx("None today", "Ingen i dag");
+    $("#practiseInfo").textContent = !todays ? tx("None today", "Ingen i dag")
+      : !left ? tx(`All ${todays} practised today ✓`, `Alle ${todays} øvet i dag ✓`)
+      : left < todays ? tx(`${left} of ${todays} words left today`, `${left} af ${todays} ord tilbage i dag`)
+      : tx(`${todays} word${todays === 1 ? "" : "s"} today, ${PRACTISE_REPS} times each`, `${todays} ord i dag, ${PRACTISE_REPS} gange hver`);
     $("#trickyInfo").textContent = tx(`${tricky} word${tricky === 1 ? "" : "s"} you found hard`, `${tricky} ord, du fandt svære`);
     showSoundIcon();
   }
