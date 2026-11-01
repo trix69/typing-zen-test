@@ -845,9 +845,8 @@
       line.classList.remove("shake"); void line.offsetWidth; line.classList.add("shake");
       if (k) { k.classList.add("miss"); setTimeout(() => k.classList.remove("miss"), 200); }
       if (it.hidden && game.revealed) $("#msg").textContent = tx("Here's a hint: type the orange letter.", "Her er et hint: skriv det orange bogstav.");
-      // Practice: a slip starts this word's 5 again, here and in the saved count (user's request, 2026-10-28).
-      // Any wrong key counts, even one typo put right at once (user's request, 2026-11-01).
-      if (game.mode === "practise") { it.reps = 0; showReps(it); savePractice(practiceDay, it.word, 0, true); }
+      // Practice: a go with any wrong key doesn't count, but the word keeps the goes it has (user's requests,
+      // 2026-11-01; it used to start the 5 again). complete() just doesn't add one.
     }
     renderLine();
   }
@@ -924,7 +923,7 @@
       game.wait = "enter";
     } else if (game.mode === "practise") {
       msg.className = "msg good";
-      msg.textContent = missed ? tx("A slip starts the count again. Type it again.", "En fejl starter tællingen forfra. Skriv det igen.")
+      msg.textContent = missed ? tx(`Not counted: there was a slip. Still ${it.reps} of ${PRACTISE_REPS}. Type it again.`, `Tæller ikke: der var en fejl. Stadig ${it.reps} af ${PRACTISE_REPS}. Skriv det igen.`)
         : it.reps < PRACTISE_REPS ? `✓ ${it.reps} ${tx("of", "af")} ${PRACTISE_REPS}. ${praise}`
         : `✓ ${it.word}: ${tx(`all ${PRACTISE_REPS} done!`, `alle ${PRACTISE_REPS} klaret!`)} ${praise}`;
       setTimeout(next, missed ? 1200 : 700);
