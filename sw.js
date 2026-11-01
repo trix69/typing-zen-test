@@ -1,16 +1,16 @@
 /* Typing Zen service worker, written by tools/make_sw.py: do not edit by hand.
    It keeps an offline copy of every file the app uses. VERSION changes whenever any of them does. */
-const VERSION = "typing-zen-test-5b36375719";
+const VERSION = "typing-zen-test-0bb51bf2a8";
 /* Only this site's caches: the live and test sites share trix69.github.io, so never touch the other's. */
 const MINE = (k) => /^typing\-zen\-test\-[0-9a-f]{10}$/.test(k);
 const FILES = [
   "./",
   "index.html",
-  "style.css?v=bf36b9c2de",
-  "words.js?v=bf36b9c2de",
-  "words-da.js?v=bf36b9c2de",
-  "data.js?v=bf36b9c2de",
-  "app.js?v=bf36b9c2de",
+  "style.css?v=fb34682a55",
+  "words.js?v=fb34682a55",
+  "words-da.js?v=fb34682a55",
+  "data.js?v=fb34682a55",
+  "app.js?v=fb34682a55",
   "manifest.webmanifest",
   "fonts/atkinson-hyperlegible-latin-400-normal.woff2",
   "fonts/atkinson-hyperlegible-latin-700-normal.woff2",

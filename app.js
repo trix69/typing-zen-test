@@ -602,7 +602,8 @@
       case "practise": {
         // Shown, not hidden: he copies each word, as many goes as it takes to get 5 clean ones.
         // Progress is kept (user's request, 2026-10-28): each word starts from its saved clean goes, and words
-        // already done are left out. When every word is done, the whole day runs again from 0.
+        // already done are left out. A day can only be started while it has a word left (home and View stats both
+        // check, R69/R51.1), so the "all done: run every word again from 0" fallback below no longer happens.
         const known = new Map(allWords().map((w) => [w.word, w]));
         const words = missedByDay(profile)[practiceDay] || [];
         const saved = practisedOn(profile, practiceDay);
@@ -1077,7 +1078,7 @@
     $("#practiseBtn").disabled = !left;
     // Cards show state only, no instructions (UX-PRINCIPLES.md, Hermes UX.1 and UX.6).
     $("#practiseInfo").textContent = !todays ? tx("None today", "Ingen i dag")
-      : !left ? tx(`All ${todays} practised today ✓`, `Alle ${todays} øvet i dag ✓`)
+      : !left ? (todays === 1 ? tx("Practised today ✓", "Øvet i dag ✓") : tx(`All ${todays} practised today ✓`, `Alle ${todays} øvet i dag ✓`))
       : left < todays ? tx(`${left} of ${todays} words left today`, `${left} af ${todays} ord tilbage i dag`)
       : tx(`${todays} word${todays === 1 ? "" : "s"} today, ${PRACTISE_REPS} times each`, `${todays} ord i dag, ${PRACTISE_REPS} gange hver`);
     $("#trickyInfo").textContent = tx(`${tricky} word${tricky === 1 ? "" : "s"} you found hard`, `${tricky} ord, du fandt svære`);
