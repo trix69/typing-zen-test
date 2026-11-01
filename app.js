@@ -430,6 +430,10 @@
     };
     say(0);
   }
+  // A word letter by letter, for Practice (user's request, 2026-11-01): "joyfully" → "J, O, Y, F, U, L, L, Y".
+  // Capitals, so voices say each letter's name; an apostrophe or hyphen is said by name.
+  const spelledOut = (w) => [...w].map((c) => (c === "'" ? tx("apostrophe", "apostrof") : c === "-" ? tx("hyphen", "bindestreg")
+    : c === " " ? tx("space", "mellemrum") : c.toUpperCase())).join(", ");
   const stopSpeech = () => { clearTimeout(speakTimer); speechRun++; if ("speechSynthesis" in window) speechSynthesis.cancel(); };
 
   // ---------- Building a round ----------
@@ -699,10 +703,14 @@
     // Kept in speakTimer, so leaving or the end of a timed game stops a word that hasn't been spoken yet.
     clearTimeout(speakTimer);
     if (it.hidden && !it.open) speakTimer = setTimeout(() => speak(it.word, it.sentence), 250);
-    else if (game.mode === "words" || (game.mode === "practise" && !it.spoken)) {
-      it.spoken = true; // Practice says the word on its first go only
-      speakTimer = setTimeout(() => speak(it.word), 250);
+    else if (game.mode === "practise" && (!it.spoken || it.sayAgain)) {
+      // Practice says the word and then spells it, on its first go and again after a go with a slip (user's
+      // requests, 2026-11-01); a clean go is followed by the next go in silence.
+      it.spoken = true;
+      it.sayAgain = false;
+      speakTimer = setTimeout(() => speak(it.word, spelledOut(it.word)), 250);
     }
+    else if (game.mode === "words") speakTimer = setTimeout(() => speak(it.word), 250);
     else if (game.mode === "sentences") speakTimer = setTimeout(() => speak(it.sentence), 250);
   }
 
@@ -895,6 +903,7 @@
     }
 
     // Practice counts the clean goes; copying a word doesn't change the tricky words.
+    if (game.mode === "practise" && missed) it.sayAgain = true; // the next go hears the word and its spelling again
     if (game.mode === "practise" && !missed) {
       it.reps++;
       showReps(it); // fill the dot now, with the message, not on the next go (so the fifth one shows too; Hermes R20.2)
@@ -1017,6 +1026,8 @@
       ? list(tx("New words mastered", "Nye ord mestret"), "mastered", masteredNow, "★ ") + list(tx("Right first try", "Rigtigt i første forsøg"), "right", rightOnly) +
         list(tx("Needs more practice", "Skal øves mere"), "again", [...game.missed])
       : list(tx("Words to practise again", "Ord at øve igen"), "", [...game.missed]);
+    // Practice ends with Home only: there is no round to play again (user's request, 2026-11-01).
+    $("#againBtn").hidden = game.mode === "practise";
     show("results");
   }
 
@@ -1159,7 +1170,7 @@
   document.addEventListener("keydown", (e) => {
     if (e.target.id === "newName") return; // typing a name on the welcome screen
     const playing = !$("#play").hidden;
-    if (!$("#results").hidden && e.key === "Enter") { e.preventDefault(); return start(game.mode, game.length); }
+    if (!$("#results").hidden && e.key === "Enter") { e.preventDefault(); return $("#againBtn").hidden ? show("home") : start(game.mode, game.length); }
     if (!$("#results").hidden && e.key === "Escape") return show("home");
     if (!playing || !game) return;
     if (e.key === "Escape") return leave();
@@ -1490,7 +1501,7 @@
     const b = e.target.closest("button");
     if (!b || !game) return;
     const it = game.items[game.idx];
-    if (b.dataset.say === "word") speak(it.word);
+    if (b.dataset.say === "word") game.mode === "practise" ? speak(it.word, spelledOut(it.word)) : speak(it.word);
     if (b.dataset.say === "sentence") speak(it.sentence);
     if ("hint" in b.dataset) $("#msg").innerHTML = `💡 <span class="rule">${escapeHtml(it.rule)}</span>`;
     b.blur();
