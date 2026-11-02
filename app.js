@@ -1040,6 +1040,8 @@
     save();
 
     if (game.mode === "spell" && done) triumph(stars);
+    if (game.mode === "spell") afterBee();
+    else $("#boardBtn").hidden = true;
     $("#stars").innerHTML = [1, 2, 3].map((i) => `<span class="${i <= stars ? "" : "off"}">⭐</span>`).join("");
     const who = profile.name ? `, ${escapeHtml(profile.name)}` : "";
     $("#resTitle").innerHTML = !done ? tx(`Time's up${who}! No words this time.`, `Tiden er gået${who}! Ingen ord denne gang.`)
@@ -1217,6 +1219,7 @@
   document.addEventListener("keydown", (e) => {
     if (e.target.id === "newName") return; // typing a name on the welcome screen
     const playing = !$("#play").hidden;
+    if (!$("#shareSheet").hidden || !$("#boardSheet").hidden) return; // the share question or the board is open
     if (!$("#results").hidden && e.key === "Enter") { e.preventDefault(); return $("#againBtn").hidden ? show("home") : start(game.mode, game.length); }
     if (!$("#results").hidden && e.key === "Escape") return show("home");
     if (!playing || !game) return;
@@ -1392,6 +1395,7 @@
     showClear(0);
     showLogout(0);
     showSync();
+    showShare();
     showLang(null);
     for (const b of $("#segLang").children) b.setAttribute("aria-checked", String(b.dataset.lang === (DA() ? "da" : "en")));
     for (const b of $("#segOrder").children) b.setAttribute("aria-checked", String(b.dataset.order === (profile.practiseOrder === "random" ? "random" : "order")));
@@ -2059,7 +2063,7 @@
   // changed last (`updated`). Clear history and a change of language set `resetAt`, which wins over anything
   // older on every device.
   const SYNC_MAX = ["bestWpm", "stars", "rounds"];
-  const SYNC_LATEST = ["year", "bucket", "tricky", "streak", "beeToday", "mute", "keySound", "voice", "practiseOrder", "lang"];
+  const SYNC_LATEST = ["year", "bucket", "tricky", "streak", "beeToday", "mute", "keySound", "voice", "practiseOrder", "lang", "share", "shareAsk"];
   const SYNC_JOINED = ["seen", "learned", "practised"];
   const pickShared = (p) => Object.fromEntries([...SYNC_MAX, ...SYNC_LATEST, ...SYNC_JOINED].filter((k) => k in p).map((k) => [k, p[k]]));
   function mergeProfile(p, r, sessions) {
@@ -2185,6 +2189,140 @@
     }
   }
   $("#syncSignIn").addEventListener("click", () => syncSignIn());
+  // ---------- Sharing: words tested this week, among everyone who shares ----------
+  // User's requests, 2026-11-03. After a Spelling Bee a Google user who hasn't decided is asked "Would you like to
+  // share and view your result?" (Yes / No / Don't remind me again); Settings has a Yes/No toggle; a user who
+  // shares gets "See where you rank" on every Spelling Bee result. Only Google users can share (the board needs a
+  // signed-in account). The board holds one document per account in BOARD: a masked name (masked on the device, so
+  // the full name never leaves it), words tested per day for the last 7 days, and when it was written. Everyone is
+  // compared on words tested in the last 7 days, across all years.
+  const BOARD = "typingZen.board-test"; // the test build uses its own (deploy_test.py)
+  // Others see a name like "Lu*****g": a few first letters and the last one, the rest as stars; short names too.
+  const maskName = (name) => {
+    const c = [...(name || "").trim()], n = c.length;
+    if (n <= 1) return "*";
+    if (n === 2) return c[0] + "*";
+    if (n <= 4) return c[0] + "*".repeat(n - 2) + c[n - 1];
+    const keep = n >= 7 ? 2 : 1;
+    return c.slice(0, keep).join("") + "*".repeat(n - keep - 1) + c[n - 1];
+  };
+  // The last 7 local days as "YYYY-MM-DD", today last.
+  const weekKeys = () => Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - (6 - i));
+    return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-") + "|" + d.toDateString();
+  });
+  const canShare = () => !!(chosen && profile.google && cloudOn());
+  function myWeek(u) {
+    const totals = dayTotals(u), days = {};
+    for (const k of weekKeys()) { const [iso, ds] = k.split("|"); if (totals[ds] && totals[ds].words) days[iso] = totals[ds].words; }
+    return days;
+  }
+  // Puts this user's week on the board (or takes it off). Quietly does nothing offline or signed out.
+  async function shareWrite(on) {
+    if (!profile.google || !cloudOn()) return false;
+    try {
+      const c = await userCloud(profile.google.uid);
+      if (!c.auth.currentUser || c.auth.currentUser.uid !== profile.google.uid) return false;
+      const b = c.fs.writeBatch(c.db), ref = c.fs.doc(c.db, BOARD, profile.google.uid);
+      if (on) b.set(ref, { name: maskName(profile.name), days: myWeek(profile), updated: new Date().toISOString() });
+      else b.delete(ref);
+      await b.commit();
+      return true;
+    } catch { return false; }
+  }
+  const shareSheet = $("#shareSheet"), boardSheet = $("#boardSheet");
+  function askShare() {
+    shareSheet.hidden = false;
+    $("#shareYes").focus();
+  }
+  function closeShare() { shareSheet.hidden = true; }
+  $("#shareYes").addEventListener("click", async () => {
+    profile.share = true;
+    save();
+    closeShare();
+    $("#boardBtn").hidden = false;
+    await openBoard();
+  });
+  $("#shareNo").addEventListener("click", () => { closeShare(); $("#againBtn").focus(); }); // asked again next time
+  $("#shareNever").addEventListener("click", () => { profile.shareAsk = false; save(); closeShare(); $("#againBtn").focus(); });
+  // After a Spelling Bee: share this week's count if the user shares, else ask (unless told not to).
+  function afterBee() {
+    $("#boardBtn").hidden = !(canShare() && profile.share === true);
+    if (!canShare()) return;
+    if (profile.share === true) shareWrite(true);
+    else if (profile.share === undefined && profile.shareAsk !== false) setTimeout(askShare, 600);
+  }
+  // The board: the top three on stairs (1 in the middle and highest, 2 on the left, 3 on the right), then a list
+  // of 4 and 5, and the users just above and below this one, with "…" for anyone skipped. Others' names are
+  // masked; this user's own name is shown.
+  async function openBoard() {
+    boardSheet.hidden = false;
+    $("#boardCard").focus();
+    const body = $("#boardBody");
+    body.innerHTML = `<p class="note">${tx("Loading…", "Henter …")}</p>`;
+    await shareWrite(true);
+    let rows;
+    try {
+      const c = await userCloud(profile.google.uid);
+      const snap = await c.fs.getDocs(c.fs.query(c.fs.collection(c.db, BOARD)));
+      const keys = weekKeys().map((k) => k.split("|")[0]);
+      rows = snap.docs.map((d) => {
+        const x = d.data() || {}, id = d.id || (d.ref && d.ref.path || "").split("/").pop();
+        return { id, name: String(x.name || "*"), words: keys.reduce((n, k) => n + (Number((x.days || {})[k]) || 0), 0) };
+      });
+    } catch {
+      body.innerHTML = `<p class="note">${navigator.onLine ? tx("Couldn't load the board just now. Please try again.", "Kunne ikke hente tavlen lige nu. Prøv igen.")
+        : tx("You're offline. The board needs the internet.", "Du er offline. Tavlen kræver internet.")}</p>`;
+      return;
+    }
+    const me = profile.google.uid;
+    if (!rows.some((r) => r.id === me)) rows.push({ id: me, name: maskName(profile.name), words: Object.values(myWeek(profile)).reduce((a, b) => a + b, 0) });
+    rows = rows.filter((r) => r.words > 0 || r.id === me).sort((a, b) => b.words - a.words || a.name.localeCompare(b.name));
+    const at = rows.findIndex((r) => r.id === me);
+    const label = (r) => (r.id === me ? escapeHtml(profile.name) : escapeHtml(r.name));
+    const wordsOf = (n) => tx(`${n} word${n === 1 ? "" : "s"}`, `${n} ord`);
+    const spot = (i, cls, medal) => (rows[i] ? `<div class="spot ${cls}${rows[i].id === me ? " me" : ""}"><span class="medal">${medal}</span>` +
+      `<span class="who">${label(rows[i])}</span><span class="n">${wordsOf(rows[i].words)}</span><div class="stair">${i + 1}</div></div>` : `<div class="spot ${cls}"></div>`);
+    const shown = [...new Set([3, 4, at - 1, at, at + 1])].filter((i) => i >= 3 && i < rows.length).sort((a, b) => a - b);
+    let list = "", last = 2;
+    for (const i of shown) {
+      if (i > last + 1) list += `<li class="gap" aria-hidden="true">…</li>`;
+      list += `<li class="${rows[i].id === me ? "me" : ""}"><span class="r">#${i + 1}</span><span>${label(rows[i])}${rows[i].id === me ? ` (${tx("you", "dig")})` : ""}</span><span class="w">${wordsOf(rows[i].words)}</span></li>`;
+      last = i;
+    }
+    if (rows.length - 1 > last) list += `<li class="gap" aria-hidden="true">…</li>`;
+    body.innerHTML = `<p class="note">${tx(`You're #${at + 1} of ${rows.length}.`, `Du er nr. ${at + 1} af ${rows.length}.`)}</p>` +
+      `<div class="podium">${spot(1, "p2", "🥈")}${spot(0, "p1", "🥇")}${spot(2, "p3", "🥉")}</div>` + (list ? `<ol class="board-list">${list}</ol>` : "");
+  }
+  function closeBoard() { boardSheet.hidden = true; ($("#boardBtn").hidden ? $("#againBtn") : $("#boardBtn")).focus(); }
+  $("#boardBtn").addEventListener("click", openBoard);
+  $("#boardDone").addEventListener("click", closeBoard);
+  boardSheet.addEventListener("click", (e) => { if (e.target === boardSheet) closeBoard(); });
+  for (const [sheetEl, close] of [[shareSheet, closeShare], [boardSheet, closeBoard]])
+    sheetEl.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } });
+  // Settings: Share my results, Yes or No. Only a Google user can share; No takes this user off the board.
+  function showShare() {
+    const g = chosen && profile.google && cloudOn();
+    for (const b of $("#segShare").children) {
+      b.disabled = !g;
+      b.setAttribute("aria-checked", String(!!g && (b.dataset.share === "yes") === (profile.share === true)));
+    }
+    $("#shareNote").textContent = !chosen ? "" : !g ? tx("Sharing needs a Google account.", "Deling kræver en Google-konto.")
+      : profile.share === true ? tx("Your words tested this week are on the board, with your name masked.", "Dine testede ord denne uge er på tavlen, med dit navn skjult.") : "";
+  }
+  $("#segShare").addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b || b.disabled) return;
+    const on = b.dataset.share === "yes";
+    profile.share = on;
+    if (!on) profile.shareAsk = false; // a clear No in Settings: don't ask after each Bee either
+    save();
+    showShare();
+    await shareWrite(on);
+  });
+
   // Log out warns first: this user and their history leave this device (they stay with the Google account and
   // come back on signing in again). Anything not yet synced is sent first; if that fails, it says it will be lost.
   const unsynced = () => { const cs = profile.cloud || {}; return (profile.updated || "") > (cs.at || "") || profile.sessions.some((x) => x.date > (cs.sentTo || "")); };

@@ -49,7 +49,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 </script>
 <!-- /pwa -->
-<link rel="stylesheet" href="style.css?v=fbb0398ff5">
+<link rel="stylesheet" href="style.css?v=24a58ef9cf">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -204,6 +204,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
         <div id="figItems"><b id="resItems">0</b><span>done</span></div>
       </div>
       <div id="resTricky"></div>
+      <button type="button" class="ghost board-btn" id="boardBtn" aria-haspopup="dialog" hidden>🏆 See where you rank</button>
       <div class="actions">
         <button class="primary" id="againBtn">Play again <kbd>Enter</kbd></button>
         <button class="ghost" id="homeBtn">Home <kbd>Esc</kbd></button>
@@ -249,6 +250,12 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       <button type="button" role="radio" aria-checked="false" data-order="order">In order</button>
       <button type="button" role="radio" aria-checked="false" data-order="random">Random</button>
     </div>
+    <h3 class="user-only" id="lblShare">Share my results</h3>
+    <div class="segc user-only" role="radiogroup" aria-labelledby="lblShare" id="segShare">
+      <button type="button" role="radio" aria-checked="false" data-share="yes">Yes</button>
+      <button type="button" role="radio" aria-checked="false" data-share="no">No</button>
+    </div>
+    <p class="note user-only" id="shareNote"></p>
     <h3 id="lblApp">Appearance</h3>
     <div class="segc" role="radiogroup" aria-labelledby="lblApp" id="segApp">
       <button type="button" role="radio" aria-checked="false" data-theme-mode="light">Light</button>
@@ -285,7 +292,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     </div>
     <h3 id="lblStar">Like this app?</h3>
     <a class="howto-btn" id="starLink" href="https://github.com/trix69/typing-zen" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg><span>Star on GitHub</span></a>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="fbb0398ff5">1.15-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="24a58ef9cf">1.16-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -344,9 +351,32 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <button type="button" class="sheet-done" id="missedDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=fbb0398ff5"></script>
-<script src="words-da.js?v=fbb0398ff5"></script>
-<script src="data.js?v=fbb0398ff5"></script>
-<script src="app.js?v=fbb0398ff5"></script>
+<!-- SHARE: asked after a Spelling Bee (Google users who haven't decided) -->
+<div class="sheet" id="shareSheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle" hidden>
+  <div class="sheet-card" id="shareCard" tabindex="-1">
+    <h2 id="shareTitle">Would you like to share and view your result?</h2>
+    <p class="note" id="shareAbout">Your words tested in the last 7 days go on a board with other Typing Zen users. Other people only see your name masked, like Lu*****g.</p>
+    <div class="share-actions">
+      <button type="button" class="primary" id="shareYes">Yes</button>
+      <button type="button" class="ghost" id="shareNo">No</button>
+      <button type="button" class="ghost" id="shareNever">Don't remind me again</button>
+    </div>
+  </div>
+</div>
+<!-- BOARD: words tested in the last 7 days, everyone who shares -->
+<div class="sheet" id="boardSheet" role="dialog" aria-modal="true" aria-labelledby="boardTitle" hidden>
+  <div class="sheet-card" id="boardCard" tabindex="-1">
+    <div class="sheet-body">
+    <h2 id="boardTitle">Top spellers this week</h2>
+    <p class="note" id="boardNote">Words tested in the last 7 days</p>
+    <div id="boardBody"></div>
+    </div>
+    <button type="button" class="sheet-done" id="boardDone">Done</button>
+  </div>
+</div>
+<script src="words.js?v=24a58ef9cf"></script>
+<script src="words-da.js?v=24a58ef9cf"></script>
+<script src="data.js?v=24a58ef9cf"></script>
+<script src="app.js?v=24a58ef9cf"></script>
 </body>
 </html>

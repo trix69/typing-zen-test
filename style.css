@@ -500,7 +500,7 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .sheet-card h3 { margin: 14px 0 8px; font: 500 12px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 /* Segmented control: one choice of several, the chosen one filled with the accent. */
 .segc { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-#segOrder, #segLang { grid-template-columns: repeat(2, 1fr); }
+#segOrder, #segLang, #segShare { grid-template-columns: repeat(2, 1fr); }
 /* Spelling Bee's length choice: one button per LENGTHS entry, side by side. */
 #lenCard { max-width: 380px; }
 .len-choices { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; margin-bottom: 12px; }
@@ -613,3 +613,25 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Sharing: the question after a Spelling Bee, and the board (user's request, 2026-11-03). */
+.board-btn { margin: 4px auto 0; }
+.share-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+#shareCard h2 { font-size: 22px; line-height: 1.2; }
+.podium { display: grid; grid-template-columns: repeat(3, 1fr); align-items: end; gap: 8px; margin: 14px 0 6px; }
+.podium .spot { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.podium .who { font: 600 14px var(--font-body); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.podium .n { font: 500 12px var(--font-mono); color: var(--muted); }
+.podium .medal { font-size: 26px; line-height: 1; }
+.podium .stair { width: 100%; border-radius: 10px 10px 0 0; background: var(--sunk); border: 1px solid var(--line); border-bottom: 0;
+  display: grid; place-items: start center; padding-top: 6px; font: 700 20px var(--font-display); color: var(--muted); }
+.podium .p1 .stair { height: 92px; background: color-mix(in srgb, var(--accent) 22%, var(--sunk)); color: var(--fg); }
+.podium .p2 .stair { height: 64px; }
+.podium .p3 .stair { height: 44px; }
+.podium .me .who, .board-list .me { color: var(--accent); }
+.board-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.board-list li { display: grid; grid-template-columns: 2.4em 1fr auto; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--line); font-size: 15px; }
+.board-list li .r { font: 600 13px var(--font-mono); color: var(--muted); }
+.board-list li .w { font: 500 13px var(--font-mono); color: var(--muted); }
+.board-list li.me { font-weight: 700; background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 8px; }
+.board-list li.gap { display: block; text-align: center; color: var(--muted); padding: 2px 0; }
