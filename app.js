@@ -330,6 +330,40 @@
     miss: () => tone(150, 0.15, "triangle", 0.06),
     chime: () => { tone(784, 0.25); setTimeout(() => tone(1047, 0.35), 110); },
   };
+  // A triumph sound when a Spelling Bee ends, bigger with more stars (user's picks, 2026-11-02, from six made for
+  // them: 1A "Little lift", 2A "Bright arpeggio", 3B "Rocket sparkle"). Made here like the other sounds, so it
+  // needs no file and works offline. Spelling Bee is never muted, so neither is this.
+  function triumph(stars) {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state !== "running") audio.resume();
+    } catch { return; }
+    const a = audio, t = a.currentTime + 0.05;
+    const C5 = 523.25, E5 = 659.25, G5 = 783.99, C6 = 1046.5, E6 = 1318.51, G6 = 1567.98, C7 = 2093;
+    // One note: brass-like (triangle and a quieter octave) or a bell (sine partials), quick attack, gentle fade.
+    const note = (at, f, dur, vol = 0.12, bell = false) => {
+      const g = a.createGain();
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(vol, at + 0.02);
+      g.gain.setValueAtTime(vol, at + Math.max(0.03, dur * 0.6));
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      g.connect(a.destination);
+      for (const [type, mult, level] of bell ? [["sine", 1, 1], ["sine", 2, 0.35], ["sine", 3, 0.12]] : [["triangle", 1, 1], ["sine", 2, 0.25]]) {
+        const o = a.createOscillator(), og = a.createGain();
+        o.type = type; o.frequency.value = f * mult; og.gain.value = level;
+        o.connect(og).connect(g); o.start(at); o.stop(at + dur + 0.05);
+      }
+    };
+    if (stars === 1) { note(t, C5, 0.18, 0.1); note(t + 0.15, E5, 0.18, 0.1); note(t + 0.3, G5, 0.45, 0.1); }
+    else if (stars === 2) {
+      [C5, E5, G5, C6].forEach((f, i) => note(t + i * 0.09, f, 0.18, 0.1));
+      [C5, E5, G5, C6].forEach((f) => note(t + 0.4, f, 0.9, 0.07));
+    } else if (stars >= 3) {
+      [C5, E5, G5, C6, E6, G6].forEach((f, i) => note(t + i * 0.07, f, 0.2, 0.09));
+      [C5, G5, C6, E6].forEach((f) => note(t + 0.5, f, 1.4, 0.08));
+      for (let i = 0; i < 9; i++) note(t + 0.55 + i * 0.06, [C7, G6, E6][i % 3] * (1 + i * 0.002), 0.25, 0.035, true);
+    }
+  }
 
   // Speaks each text in turn with a one-second pause between them.
   // Any new call (or leaving the game) stops a sequence that is still playing.
@@ -1005,6 +1039,7 @@
     if (newBest) profile.bestWpm = speed;
     save();
 
+    if (game.mode === "spell" && done) triumph(stars);
     $("#stars").innerHTML = [1, 2, 3].map((i) => `<span class="${i <= stars ? "" : "off"}">⭐</span>`).join("");
     const who = profile.name ? `, ${escapeHtml(profile.name)}` : "";
     $("#resTitle").innerHTML = !done ? tx(`Time's up${who}! No words this time.`, `Tiden er gået${who}! Ingen ord denne gang.`)
