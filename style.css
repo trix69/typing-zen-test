@@ -610,10 +610,6 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   #play .line { font-size: min(5.4rem, 9dvh); line-height: 1; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-}
-
 /* Sharing: the question after a Spelling Bee, and the board (user's request, 2026-11-03). */
 .board-btn { margin: 4px auto 0; }
 .share-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
@@ -635,3 +631,8 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .board-list li .w { font: 500 13px var(--font-mono); color: var(--muted); }
 .board-list li.me { font-weight: 700; background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 8px; }
 .board-list li.gap { display: block; text-align: center; color: var(--muted); padding: 2px 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
