@@ -655,6 +655,7 @@
 
   // length: "short" or "long" for Spelling Bee (its card's data-length); kept for Play again.
   function start(mode, length) {
+    cancelAsk();
     game = null; // a new session must not see the last one's words as used
     loadSwitch(currentSwitch()); // fetch the key sounds now (a click), so the first key isn't silent
     const items = buildItems(mode);
@@ -1040,7 +1041,7 @@
     save();
 
     if (game.mode === "spell" && done) triumph(stars);
-    if (game.mode === "spell") afterBee();
+    if (game.mode === "spell") afterBee(done);
     else $("#boardBtn").hidden = true;
     $("#stars").innerHTML = [1, 2, 3].map((i) => `<span class="${i <= stars ? "" : "off"}">⭐</span>`).join("");
     const who = profile.name ? `, ${escapeHtml(profile.name)}` : "";
@@ -1076,6 +1077,7 @@
 
   // ---------- Screens ----------
   function show(id) {
+    if (id !== "results") cancelAsk(); // the share question belongs to the results screen (Hermes R73.1)
     if (id !== "play") $("#typer").blur(); // the device keyboard goes away with the game
     for (const s of document.querySelectorAll(".screen")) s.hidden = s.id !== id;
     if (id === "home") renderHome();
@@ -2233,11 +2235,34 @@
     } catch { return false; }
   }
   const shareSheet = $("#shareSheet"), boardSheet = $("#boardSheet");
+  // The question waits 0.6 s after the results; leaving the results screen first cancels it (Hermes R73.1), so it
+  // can never open over the next round or Home.
+  // (var and a function declaration: show() and start() call it, and show() runs before this line at start-up.)
+  var askTimer = 0;
+  function cancelAsk() { clearTimeout(askTimer); askTimer = 0; }
+  // Both sheets are modal to the keyboard, like Settings (Hermes R73.2): Esc closes, Tab stays inside.
+  const trapFor = (sheetEl, close) => (e) => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); return close(); }
+    if (e.key !== "Tab") return;
+    const items = [...sheetEl.querySelectorAll("button")].filter((b) => !b.hidden && !b.disabled);
+    const first = items[0], last = items[items.length - 1];
+    if (!sheetEl.contains(document.activeElement)) { e.preventDefault(); return first.focus(); }
+    if (e.shiftKey && (document.activeElement === first || !items.includes(document.activeElement))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+  const onShareKey = trapFor(shareSheet, () => closeShare()), onBoardKey = trapFor(boardSheet, () => closeBoard());
   function askShare() {
+    askTimer = 0;
+    if ($("#results").hidden) return;
     shareSheet.hidden = false;
+    document.addEventListener("keydown", onShareKey, true);
     $("#shareYes").focus();
   }
-  function closeShare() { shareSheet.hidden = true; }
+  function closeShare() {
+    shareSheet.hidden = true;
+    document.removeEventListener("keydown", onShareKey, true);
+    $("#againBtn").focus();
+  }
   $("#shareYes").addEventListener("click", async () => {
     profile.share = true;
     save();
@@ -2245,21 +2270,24 @@
     $("#boardBtn").hidden = false;
     await openBoard();
   });
-  $("#shareNo").addEventListener("click", () => { closeShare(); $("#againBtn").focus(); }); // asked again next time
-  $("#shareNever").addEventListener("click", () => { profile.shareAsk = false; save(); closeShare(); $("#againBtn").focus(); });
+  $("#shareNo").addEventListener("click", () => closeShare()); // asked again next time
+  $("#shareNever").addEventListener("click", () => { profile.shareAsk = false; save(); closeShare(); });
   // After a Spelling Bee: share this week's count if the user shares, else ask (unless told not to).
-  function afterBee() {
+  function afterBee(done) {
+    cancelAsk();
     $("#boardBtn").hidden = !(canShare() && profile.share === true);
     if (!canShare()) return;
     if (profile.share === true) shareWrite(true);
-    else if (profile.share === undefined && profile.shareAsk !== false) setTimeout(askShare, 600);
+    // Asked only after a Bee with words done: a round that tested nothing has no result to share (Hermes note).
+    else if (done && profile.share === undefined && profile.shareAsk !== false) askTimer = setTimeout(askShare, 600);
   }
   // The board: the top three on stairs (1 in the middle and highest, 2 on the left, 3 on the right), then a list
   // of 4 and 5, and the users just above and below this one, with "…" for anyone skipped. Others' names are
   // masked; this user's own name is shown.
   async function openBoard() {
     boardSheet.hidden = false;
-    $("#boardCard").focus();
+    document.addEventListener("keydown", onBoardKey, true);
+    $("#boardDone").focus();
     const body = $("#boardBody");
     body.innerHTML = `<p class="note">${tx("Loading…", "Henter …")}</p>`;
     await shareWrite(true);
@@ -2296,12 +2324,14 @@
     body.innerHTML = `<p class="note">${tx(`You're #${at + 1} of ${rows.length}.`, `Du er nr. ${at + 1} af ${rows.length}.`)}</p>` +
       `<div class="podium">${spot(1, "p2", "🥈")}${spot(0, "p1", "🥇")}${spot(2, "p3", "🥉")}</div>` + (list ? `<ol class="board-list">${list}</ol>` : "");
   }
-  function closeBoard() { boardSheet.hidden = true; ($("#boardBtn").hidden ? $("#againBtn") : $("#boardBtn")).focus(); }
+  function closeBoard() {
+    boardSheet.hidden = true;
+    document.removeEventListener("keydown", onBoardKey, true);
+    ($("#boardBtn").hidden ? $("#againBtn") : $("#boardBtn")).focus();
+  }
   $("#boardBtn").addEventListener("click", openBoard);
   $("#boardDone").addEventListener("click", closeBoard);
   boardSheet.addEventListener("click", (e) => { if (e.target === boardSheet) closeBoard(); });
-  for (const [sheetEl, close] of [[shareSheet, closeShare], [boardSheet, closeBoard]])
-    sheetEl.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } });
   // Settings: Share my results, Yes or No. Only a Google user can share; No takes this user off the board.
   function showShare() {
     const g = chosen && profile.google && cloudOn();
