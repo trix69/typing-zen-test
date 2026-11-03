@@ -1221,7 +1221,7 @@
   document.addEventListener("keydown", (e) => {
     if (e.target.id === "newName") return; // typing a name on the welcome screen
     const playing = !$("#play").hidden;
-    if (!$("#shareSheet").hidden || !$("#boardSheet").hidden) return; // the share question or the board is open
+    if (!$("#shareSheet").hidden || !$("#boardSheet").hidden || !$("#updSheet").hidden) return; // the share question, the board or the update question is open
     if (!$("#results").hidden && e.key === "Enter") { e.preventDefault(); return $("#againBtn").hidden ? show("home") : start(game.mode, game.length); }
     if (!$("#results").hidden && e.key === "Escape") return show("home");
     if (!playing || !game) return;
@@ -1401,6 +1401,7 @@
     showLang(null);
     for (const b of $("#segLang").children) b.setAttribute("aria-checked", String(b.dataset.lang === (DA() ? "da" : "en")));
     for (const b of $("#segOrder").children) b.setAttribute("aria-checked", String(b.dataset.order === (profile.practiseOrder === "random" ? "random" : "order")));
+    for (const b of $("#segUpd").children) b.setAttribute("aria-checked", String((b.dataset.upd === "on") === autoUpd()));
     // No one chosen: no one's year, sound or order is shown as picked.
     if (none) for (const b of sheet.querySelectorAll("#segYear button, #segSound button, #segOrder button")) b.setAttribute("aria-checked", "false");
   }
@@ -1440,28 +1441,87 @@
     reg.update().then(() => { if (!reg.installing && !reg.waiting) { clearTimeout(t); done(false); } },
       () => { clearTimeout(t); done(false); });
   });
+  // The release on the site when it is newer than this page, else null; throws when the site can't be reached
+  // (offline, or the single-file copy). A different build stamp counts as newer (test builds keep the number).
+  const verNum = (v) => String(v).split(".").reduce((n, p, i) => n + (+p || 0) / 1000 ** i, 0);
+  async function newerVersion() {
+    const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const live = await r.json(), mine = $("#appVersion");
+    return (mine.dataset.build ? live.build !== mine.dataset.build : verNum(live.version) > verNum(mine.textContent)) ? live : null;
+  }
+  // With the offline copy (sw.js), fetches the new copy into the device and reloads; without one, opens the new
+  // version with ?v= in the address, so the browser fetches fresh files instead of reusing old ones.
+  async function updateTo(live) {
+    const sw = navigator.serviceWorker, reg = sw && sw.controller && (await sw.getRegistration());
+    if (reg && !(await newCopy(reg))) {
+      // No new copy came (an old sw.js, say): drop this site's saved copies so the reload fetches everything.
+      const mine = new RegExp("^" + CACHE_PREFIX + "[0-9a-f]{10}$");
+      await Promise.all((await caches.keys()).filter((k) => mine.test(k)).map((k) => caches.delete(k)));
+      await reg.unregister();
+    }
+    location.replace(location.pathname + "?v=" + encodeURIComponent(live.build || live.version));
+  }
   $("#verBtn").addEventListener("click", async () => {
-    const msg = $("#verMsg"), mine = $("#appVersion");
+    const msg = $("#verMsg");
     msg.textContent = tx("Checking…", "Søger…");
     try {
-      const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
-      if (!r.ok) throw new Error(r.status);
-      const live = await r.json();
-      const same = mine.dataset.build ? live.build === mine.dataset.build : live.version === mine.textContent;
-      if (same) { msg.textContent = tx("Up to date", "Du har den nyeste version"); return; }
+      const live = await newerVersion();
+      if (!live) { msg.textContent = tx("Up to date", "Du har den nyeste version"); return; }
       msg.textContent = `${tx("Updating to", "Opdaterer til")} ${live.version}…`;
-      const sw = navigator.serviceWorker, reg = sw && sw.controller && (await sw.getRegistration());
-      if (reg && !(await newCopy(reg))) {
-        // No new copy came (an old sw.js, say): drop this site's saved copies so the reload fetches everything.
-        const mine = new RegExp("^" + CACHE_PREFIX + "[0-9a-f]{10}$");
-        await Promise.all((await caches.keys()).filter((k) => mine.test(k)).map((k) => caches.delete(k)));
-        await reg.unregister();
-      }
-      location.replace(location.pathname + "?v=" + encodeURIComponent(live.build || live.version));
+      await updateTo(live);
     } catch {
       msg.textContent = navigator.onLine === false ? tx("Can't check while offline", "Kan ikke søge uden internet") : tx("Can't check here", "Kan ikke søge her");
     }
   });
+  // Automatic update check (user's request, 2026-11-03, like Violin Toolkit): when the app opens, and when it
+  // comes back after 6 hours away (a Home Screen app is often resumed rather than reopened). It asks first, only
+  // on the welcome or home screen with nothing else open (never in a round), and once per release per visit.
+  // Offline it stays quiet and tries again on the next return. Settings > Automatic update check turns it off
+  // for this device (typingZen.autoUpd = "off", shared by the live and test sites like the appearance).
+  // A function declaration, so syncSheet can read it whenever it runs.
+  function autoUpd() { try { return localStorage.getItem("typingZen.autoUpd") !== "off"; } catch { return true; } }
+  const updSheet = $("#updSheet");
+  let updPending = null, updOffered = "", updLast = 0, updOpener = null;
+  async function autoCheck() {
+    if (!autoUpd() || document.hidden || Date.now() - updLast < 6 * 3600e3) return;
+    updLast = Date.now();
+    try {
+      const live = await newerVersion();
+      if (live && (live.build || live.version) !== updOffered) askUpdate(live);
+    } catch { updLast = 0; }
+  }
+  function askUpdate(live) {
+    if (!autoUpd()) return;
+    const busy = document.hidden || ($("#welcome").hidden && $("#home").hidden) || [...document.querySelectorAll(".sheet")].some((el) => !el.hidden);
+    if (busy) { setTimeout(() => askUpdate(live), 5000); return; }
+    updPending = live; updOffered = live.build || live.version;
+    $("#updMsg").textContent = tx(`Version ${live.version} is ready. Update now?`, `Version ${live.version} er klar. Vil du opdatere nu?`);
+    updOpener = document.activeElement;
+    updSheet.hidden = false;
+    document.addEventListener("keydown", onUpdKey, true);
+    $("#updNow").focus();
+  }
+  function onUpdKey(e) { trapFor(updSheet, closeUpd)(e); }
+  function closeUpd() {
+    updSheet.hidden = true;
+    document.removeEventListener("keydown", onUpdKey, true);
+    try { updOpener.focus(); } catch { /* it has gone */ }
+  }
+  $("#updLater").addEventListener("click", closeUpd);
+  updSheet.addEventListener("click", (e) => { if (e.target === updSheet) closeUpd(); });
+  $("#updNow").addEventListener("click", () => {
+    closeUpd();
+    if (updPending) updateTo(updPending).catch(() => location.reload());
+  });
+  $("#segUpd").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    try { localStorage.setItem("typingZen.autoUpd", b.dataset.upd); } catch { /* storage unavailable */ }
+    syncSheet();
+  });
+  setTimeout(autoCheck, 1500);
+  document.addEventListener("visibilitychange", autoCheck);
   $("#sheetDone").addEventListener("click", closeSheet);
   sheet.addEventListener("click", (e) => { if (e.target === sheet) closeSheet(); });
   // Practice order (user's request, 2026-10-28): the day's words in the order they were missed, or shuffled.
@@ -2466,7 +2526,7 @@
   (() => {
     const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let n; (n = walk.nextNode());) if (n.nodeValue.trim()) PAGE_TEXT.push([n, null, n.nodeValue]);
-    for (const a of ["aria-label", "title", "placeholder"])
+    for (const a of ["aria-label", "title", "placeholder", "alt"])
       for (const el of document.querySelectorAll(`[${a}]`)) PAGE_TEXT.push([el, a, el.getAttribute(a)]);
   })();
   function translatePage() {

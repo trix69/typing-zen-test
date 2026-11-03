@@ -500,7 +500,13 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .sheet-card h3 { margin: 14px 0 8px; font: 500 12px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 /* Segmented control: one choice of several, the chosen one filled with the accent. */
 .segc { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-#segOrder, #segLang, #segShare { grid-template-columns: repeat(2, 1fr); }
+#segOrder, #segLang, #segShare, #segUpd { grid-template-columns: repeat(2, 1fr); }
+/* Support (like Violin Toolkit): the coffee button, with its QR code beside it on a computer */
+.support { display: flex; align-items: center; gap: 14px; }
+.support-btn { flex: 1; }
+.support-btn span[aria-hidden] { font-size: 18px; }
+.support-qr { display: none; width: 128px; height: 128px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+@media (hover: hover) and (min-width: 700px) { .support-qr { display: block; } .support-btn { height: 128px; flex-direction: column; } }
 /* Spelling Bee's length choice: one button per LENGTHS entry, side by side. */
 #lenCard { max-width: 380px; }
 .len-choices { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 10px; margin-bottom: 12px; }

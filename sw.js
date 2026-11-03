@@ -1,16 +1,16 @@
 /* Typing Zen service worker, written by tools/make_sw.py: do not edit by hand.
    It keeps an offline copy of every file the app uses. VERSION changes whenever any of them does. */
-const VERSION = "typing-zen-test-4f97560cca";
+const VERSION = "typing-zen-test-118451d1c7";
 /* Only this site's caches: the live and test sites share trix69.github.io, so never touch the other's. */
 const MINE = (k) => /^typing\-zen\-test\-[0-9a-f]{10}$/.test(k);
 const FILES = [
   "./",
   "index.html",
-  "style.css?v=f5317c316e",
-  "words.js?v=f5317c316e",
-  "words-da.js?v=f5317c316e",
-  "data.js?v=f5317c316e",
-  "app.js?v=f5317c316e",
+  "style.css?v=6fda3a3615",
+  "words.js?v=6fda3a3615",
+  "words-da.js?v=6fda3a3615",
+  "data.js?v=6fda3a3615",
+  "app.js?v=6fda3a3615",
   "manifest.webmanifest",
   "fonts/atkinson-hyperlegible-latin-400-normal.woff2",
   "fonts/atkinson-hyperlegible-latin-700-normal.woff2",
@@ -19,6 +19,7 @@ const FILES = [
   "fonts/dm-sans-latin-wght-normal.woff2",
   "fonts/outfit-latin-wght-normal.woff2",
   "icons/apple-touch-icon.png",
+  "icons/bmc-qr.png",
   "icons/icon-192.png",
   "icons/icon-512-maskable.png",
   "icons/icon-512.png",
