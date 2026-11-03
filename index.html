@@ -49,7 +49,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 </script>
 <!-- /pwa -->
-<link rel="stylesheet" href="style.css?v=6fda3a3615">
+<link rel="stylesheet" href="style.css?v=009d9cf99a">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -102,7 +102,10 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
         <ol class="week-chart" id="weekChart" aria-label="Words tested each day, last 7 days: right first try, practised and to practise" hidden></ol>
         <div class="week-foot">
           <p class="week-key" id="weekKey" aria-hidden="true" hidden><span><i class="first"></i>Right first try</span><span><i class="practised"></i>Practised</span><span><i class="again"></i>To practise</span></p>
-          <button type="button" class="ghost small" id="missedBtn" aria-haspopup="dialog" hidden>See the words</button>
+          <div class="week-btns">
+            <button type="button" class="ghost small" id="missedBtn" aria-haspopup="dialog" hidden>See the words</button>
+            <button type="button" class="ghost small" id="rankBtn" aria-haspopup="dialog" hidden>🏆 See where you rank</button>
+          </div>
         </div>
         <p class="week-line" id="masterLine" hidden></p>
         <div class="master-chart" id="masterChart" hidden></div>
@@ -302,7 +305,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       <button type="button" role="radio" aria-checked="true" data-upd="on">On</button>
       <button type="button" role="radio" aria-checked="false" data-upd="off">Off</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="6fda3a3615">1.17-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="009d9cf99a">1.17-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -395,9 +398,9 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <button type="button" class="sheet-done" id="boardDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=6fda3a3615"></script>
-<script src="words-da.js?v=6fda3a3615"></script>
-<script src="data.js?v=6fda3a3615"></script>
-<script src="app.js?v=6fda3a3615"></script>
+<script src="words.js?v=009d9cf99a"></script>
+<script src="words-da.js?v=009d9cf99a"></script>
+<script src="data.js?v=009d9cf99a"></script>
+<script src="app.js?v=009d9cf99a"></script>
 </body>
 </html>

@@ -1493,7 +1493,9 @@
   }
   function askUpdate(live) {
     if (!autoUpd()) return;
-    const busy = document.hidden || ($("#welcome").hidden && $("#home").hidden) || [...document.querySelectorAll(".sheet")].some((el) => !el.hidden);
+    // A name being typed on the welcome screen counts as busy too, so the question never takes the caret (Hermes R76.1).
+    const typing = document.activeElement === $("#newName") && !!$("#newName").value.trim();
+    const busy = document.hidden || typing || ($("#welcome").hidden && $("#home").hidden) || [...document.querySelectorAll(".sheet")].some((el) => !el.hidden);
     if (busy) { setTimeout(() => askUpdate(live), 5000); return; }
     updPending = live; updOffered = live.build || live.version;
     $("#updMsg").textContent = tx(`Version ${live.version} is ready. Update now?`, `Version ${live.version} er klar. Vil du opdatere nu?`);
@@ -1694,8 +1696,12 @@
       for (const w of s.firstTryWords) if (typeof w === "string" && !list.includes(w) && !again.includes(w)) list.push(w);
     }
     for (const day of Object.keys(missed)) days[day] = days[day] || [];
-    return Object.entries(days).filter(([day, l]) => l.length || (missed[day] || []).length)
-      .sort(([a], [b]) => new Date(b) - new Date(a)).map(([day, first]) => ({ day, first, again: missed[day] || [] }));
+    // A day with words tested but no word lists (rounds saved before the lists were kept) still has a section,
+    // with its count (user's request, 2026-11-04: the button shows whenever words were tested in the last 7 days).
+    const totals = dayTotals(u);
+    for (const [day, t] of Object.entries(totals)) if (t.words && new Date(day) >= from) days[day] = days[day] || [];
+    return Object.entries(days).filter(([day, l]) => l.length || (missed[day] || []).length || (totals[day] && totals[day].words))
+      .sort(([a], [b]) => new Date(b) - new Date(a)).map(([day, first]) => ({ day, first, again: missed[day] || [], tested: (totals[day] || {}).words || 0 }));
   }
   // Spelling Bee today: { day, clean: { word: times right first try today } }; starts again each new day.
   function beeToday() {
@@ -1819,6 +1825,7 @@
     $("#continueBtn").textContent = tx(`Continue as ${last.name}`, `Fortsæt som ${last.name}`);
     $("#missedBtn").hidden = !wordsByDay(last).length;
     $("#missedBtn").textContent = tx("See the words", "Se ordene");
+    $("#rankBtn").hidden = !(last.google && last.share === true && cloudOn());
   }
   function fillUsers() {
     $("#userList").innerHTML = users().map((u) =>
@@ -1918,14 +1925,16 @@
     const u = store.users[store.current];
     const today = new Date().toDateString(), yesterday = new Date(Date.now() - 864e5).toDateString();
     const chips = (l) => `<div class="tricky-list">${l}</div>`;
-    $("#missedDays").innerHTML = wordsByDay(u).map(({ day, first, again: words }) => {
+    $("#missedDays").innerHTML = wordsByDay(u).map(({ day, first, again: words, tested }) => {
       const name = day === today ? tx("Today", "I dag") : day === yesterday ? tx("Yesterday", "I går")
         : new Date(day).toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
       const reps = practisedOn(u, day);
       const done = words.filter((w) => reps[w] >= PRACTISE_REPS), todo = words.filter((w) => !(reps[w] >= PRACTISE_REPS));
       const group = (cls, label, l, chip) => (l.length ? `<p class="words-label"><i class="${cls}"></i>${label} (${l.length})</p>` + chips(l.map(chip).join("")) : "");
       // The same three groups and colours as the week chart.
-      return `<section class="missed-day"><h3>${name}</h3>` +
+      const unlisted = !first.length && !words.length
+        ? `<p class="note">${tx(`${tested} word${tested === 1 ? "" : "s"} tested. The words themselves weren't kept for this day.`, `${tested} ord testet. Selve ordene blev ikke gemt for denne dag.`)}</p>` : "";
+      return `<section class="missed-day"><h3>${name}</h3>` + unlisted +
         group("first", tx("Right first try", "Rigtigt i første forsøg"), first, (w) => `<span>${escapeHtml(w)}</span>`) +
         group("practised", tx("Practised", "Øvet"), done, (w) => `<span class="done">✓ ${escapeHtml(w)}</span>`) +
         group("again", tx("To practise", "Skal øves"), todo, (w) => reps[w]
@@ -2282,13 +2291,13 @@
     return days;
   }
   // Puts this user's week on the board (or takes it off). Quietly does nothing offline or signed out.
-  async function shareWrite(on) {
-    if (!profile.google || !cloudOn()) return false;
+  async function shareWrite(on, u = profile) {
+    if (!u.google || !cloudOn()) return false;
     try {
-      const c = await userCloud(profile.google.uid);
-      if (!c.auth.currentUser || c.auth.currentUser.uid !== profile.google.uid) return false;
-      const b = c.fs.writeBatch(c.db), ref = c.fs.doc(c.db, BOARD, profile.google.uid);
-      if (on) b.set(ref, { name: maskName(profile.name), days: myWeek(profile), updated: new Date().toISOString() });
+      const c = await userCloud(u.google.uid);
+      if (!c.auth.currentUser || c.auth.currentUser.uid !== u.google.uid) return false;
+      const b = c.fs.writeBatch(c.db), ref = c.fs.doc(c.db, BOARD, u.google.uid);
+      if (on) b.set(ref, { name: maskName(u.name), days: myWeek(u), updated: new Date().toISOString() });
       else b.delete(ref);
       await b.commit();
       return true;
@@ -2344,16 +2353,18 @@
   // The board: the top three on stairs (1 in the middle and highest, 2 on the left, 3 on the right), then a list
   // of 4 and 5, and the users just above and below this one, with "…" for anyone skipped. Others' names are
   // masked; this user's own name is shown.
-  async function openBoard() {
+  // u: the user whose rank it shows (the stats card passes the user it shows, who may not be chosen yet).
+  async function openBoard(u = profile) {
+    boardOpener = document.activeElement;
     boardSheet.hidden = false;
     document.addEventListener("keydown", onBoardKey, true);
     $("#boardDone").focus();
     const body = $("#boardBody");
     body.innerHTML = `<p class="note">${tx("Loading…", "Henter …")}</p>`;
-    await shareWrite(true);
+    await shareWrite(true, u);
     let rows;
     try {
-      const c = await userCloud(profile.google.uid);
+      const c = await userCloud(u.google.uid);
       const snap = await c.fs.getDocs(c.fs.query(c.fs.collection(c.db, BOARD)));
       const keys = weekKeys().map((k) => k.split("|")[0]);
       rows = snap.docs.map((d) => {
@@ -2365,11 +2376,11 @@
         : tx("You're offline. The board needs the internet.", "Du er offline. Tavlen kræver internet.")}</p>`;
       return;
     }
-    const me = profile.google.uid;
-    if (!rows.some((r) => r.id === me)) rows.push({ id: me, name: maskName(profile.name), words: Object.values(myWeek(profile)).reduce((a, b) => a + b, 0) });
+    const me = u.google.uid;
+    if (!rows.some((r) => r.id === me)) rows.push({ id: me, name: maskName(u.name), words: Object.values(myWeek(u)).reduce((a, b) => a + b, 0) });
     rows = rows.filter((r) => r.words > 0 || r.id === me).sort((a, b) => b.words - a.words || a.name.localeCompare(b.name));
     const at = rows.findIndex((r) => r.id === me);
-    const label = (r) => (r.id === me ? escapeHtml(profile.name) : escapeHtml(r.name));
+    const label = (r) => (r.id === me ? escapeHtml(u.name) : escapeHtml(r.name));
     const wordsOf = (n) => tx(`${n} word${n === 1 ? "" : "s"}`, `${n} ord`);
     const spot = (i, cls, medal) => (rows[i] ? `<div class="spot ${cls}${rows[i].id === me ? " me" : ""}"><span class="medal">${medal}</span>` +
       `<span class="who">${label(rows[i])}</span><span class="n">${wordsOf(rows[i].words)}</span><div class="stair">${i + 1}</div></div>` : `<div class="spot ${cls}"></div>`);
@@ -2387,9 +2398,13 @@
   function closeBoard() {
     boardSheet.hidden = true;
     document.removeEventListener("keydown", onBoardKey, true);
-    ($("#boardBtn").hidden ? $("#againBtn") : $("#boardBtn")).focus();
+    const back = boardOpener && !boardOpener.hidden && boardOpener.isConnected ? boardOpener : ($("#boardBtn").hidden ? $("#againBtn") : $("#boardBtn"));
+    back.focus();
   }
-  $("#boardBtn").addEventListener("click", openBoard);
+  let boardOpener = null;
+  $("#boardBtn").addEventListener("click", () => openBoard());
+  // The stats card (Welcome back, View stats) has the same button for a user who shares (user's request, 2026-11-04).
+  $("#rankBtn").addEventListener("click", () => { const u = store.users[store.current]; if (u) openBoard(u); });
   $("#boardDone").addEventListener("click", closeBoard);
   boardSheet.addEventListener("click", (e) => { if (e.target === boardSheet) closeBoard(); });
   // Settings: Share my results, Yes or No. Only a Google user can share; No takes this user off the board.

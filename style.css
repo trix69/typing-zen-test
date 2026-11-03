@@ -250,6 +250,9 @@ kbd {
 /* The colour key and Words to practise share a row, so welcome back still fits a phone on its side. */
 .week-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
 .week-foot:not(:has(> :not([hidden]))) { display: none; }
+.week-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.week-btns:not(:has(> :not([hidden]))) { display: none; }
+.week-foot:not(:has(> :not([hidden]):not(.week-btns), .week-btns > :not([hidden]))) { display: none; }
 /* Words to practise: one group per day. */
 .missed-day { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
 .missed-day:first-child { border-top: 0; }
