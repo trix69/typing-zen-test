@@ -542,6 +542,14 @@
     const gap = `<span class="gap" aria-label="${word.length} ${tx("letters", "bogstaver")}">${"_".repeat(word.length)}</span>`;
     return escapeHtml(sentence.slice(0, at)) + gap + escapeHtml(sentence.slice(at + word.length));
   }
+  // A Chinese word's example sentence (user's request, 2026-11-04), with the word marked in it.
+  const zhSentence = (it) => {
+    if (!it.sentence) return "";
+    const at = it.sentence.indexOf(it.word);
+    const s = at < 0 ? escapeHtml(it.sentence)
+      : escapeHtml(it.sentence.slice(0, at)) + `<mark>${escapeHtml(it.word)}</mark>` + escapeHtml(it.sentence.slice(at + it.word.length));
+    return `<div class="clue zh-clue" lang="zh-CN">${s}</div>`;
+  };
   const tricky = () => tx("Tricky bit:", "Svært:");
   const tip = (it) => (it.why ? `<div class="why">${tricky()} ${escapeHtml(it.why)}</div>` : "");
 
@@ -781,10 +789,12 @@
     if (m === "warm") {
       card.innerHTML = `<div class="tagline">${escapeHtml(it.tag)}</div>`;
     } else if (it.type && (m === "spell" || m === "tricky")) {
-      // Chinese: the characters and their meaning; the pinyin is what is typed, so it isn't shown.
+      // Chinese: the characters, their meaning and the example sentence with the word marked; the pinyin is what
+      // is typed, so it isn't shown.
       card.innerHTML = `<div class="hanzi" lang="zh-CN">${escapeHtml(it.word)}</div>
         <div class="meaning">${tx("It means", "Det betyder")} ${escapeHtml(it.meaning)}</div>
-        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear the word", "Hør ordet")}</button></div>`;
+        ${zhSentence(it)}
+        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear the word", "Hør ordet")}</button>${it.sentence ? `<button class="ghost" data-say="sentence">🔊 ${tx("Hear the sentence", "Hør sætningen")}</button>` : ""}</div>`;
     } else if (it.type) {
       // Chinese, shown (Word Garden, Practice): the characters, their pinyin with tones and the meaning.
       card.innerHTML = (m === "practise" ? `<div class="tagline">${tx(`Type it ${PRACTISE_REPS} times with no mistakes`, `Skriv det ${PRACTISE_REPS} gange uden fejl`)}</div>
@@ -792,7 +802,8 @@
         `<div class="hanzi" lang="zh-CN">${escapeHtml(it.word)}</div>
         <div class="pinyin">${escapeHtml(it.pinyin)}</div>
         <div class="meaning">${tx("It means", "Det betyder")} ${escapeHtml(it.meaning)}</div>
-        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear it", "Hør det")}</button></div>`;
+        ${zhSentence(it)}
+        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear it", "Hør det")}</button>${it.sentence ? `<button class="ghost" data-say="sentence">🔊 ${tx("Hear the sentence", "Hør sætningen")}</button>` : ""}</div>`;
     } else if (m === "words") {
       card.innerHTML = `<div class="meaning"><b>${escapeHtml(it.word)}</b> ${means} ${escapeHtml(it.meaning)}</div>
         ${tip(it)}
@@ -1529,8 +1540,9 @@
   function askUpdate(live) {
     if (!autoUpd()) return;
     // A half-filled first-visit form counts as busy too, focused or not, so the question never takes the caret or
-    // Enter from it (Hermes R76.1, R76.3); it asks on home once the user has joined.
-    const typing = !$("#welcome").hidden && !$("#intro-new").hidden && !!$("#newName").value.trim();
+    // Enter from it (Hermes R76.1, R76.3, R76.4); it asks on home once the user has joined.
+    const typing = document.activeElement === $("#newName") // Hermes R76.4: the caret in the box, even empty
+      || (!$("#welcome").hidden && !$("#intro-new").hidden && !!$("#newName").value.trim());
     const busy = document.hidden || typing || ($("#welcome").hidden && $("#home").hidden) || [...document.querySelectorAll(".sheet")].some((el) => !el.hidden);
     if (busy) { setTimeout(() => askUpdate(live), 5000); return; }
     updPending = live; updOffered = live.build || live.version;
