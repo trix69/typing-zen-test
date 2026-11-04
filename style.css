@@ -13,6 +13,7 @@
 /* Colour tokens, named as in Violin Toolkit. Light is the default; the theme script in index.html sets
    data-theme="light" or "dark" on <html>, and Automatic (no attribute) follows the device. */
 :root {
+  --logo-invert: 0; --logo-blend: multiply;
   --bg: #ffffff;
   --fg: #111111;
   --muted: #555b61;
@@ -48,6 +49,7 @@
 /* Dark keys keep the same idea: a calm fill with a strong, bright finger-coloured edge. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    --logo-invert: 1; --logo-blend: screen;
     --bg: #111613;
     --fg: #e6ece8;
     --muted: #9eaaa3;
@@ -76,6 +78,7 @@
   }
 }
 :root[data-theme="dark"] {
+  --logo-invert: 1; --logo-blend: screen;
   --bg: #111613;
   --fg: #e6ece8;
   --muted: #9eaaa3;
@@ -137,11 +140,9 @@ kbd {
 .brand-text { flex: 1; min-width: 0; }
 .brand h1 { font: 700 2.6rem/1 var(--font-display); margin: 0; letter-spacing: -0.02em; color: var(--accent); }
 .brand .tag { margin: 4px 0 0; color: var(--muted); }
-.pebbles { display: flex; align-items: flex-end; gap: 3px; }
-.pebbles i { display: block; background: var(--accent); border-radius: 50%; }
-.pebbles i:nth-child(1) { width: 18px; height: 13px; opacity: .55; }
-.pebbles i:nth-child(2) { width: 26px; height: 19px; }
-.pebbles i:nth-child(3) { width: 14px; height: 10px; opacity: .35; }
+/* Trix's hand-drawn logo ("type good", the app icon; user's request, 2026-11-04, replacing the three pebbles). Black on
+   white: its white blends into the light page, and in dark it is inverted and its black blends into the dark page. */
+.logo { display: block; width: 64px; height: 64px; flex: none; filter: invert(var(--logo-invert)); mix-blend-mode: var(--logo-blend); }
 
 /* Square icon button, like Violin Toolkit's tabs (used for the Settings gear). */
 .icon-btn {

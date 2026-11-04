@@ -49,7 +49,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 </script>
 <!-- /pwa -->
-<link rel="stylesheet" href="style.css?v=87c745ee2f">
+<link rel="stylesheet" href="style.css?v=9e03bb6931">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -60,7 +60,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   <!-- Shown first (its panels stay hidden until app.js picks one), so nothing else paints before the script runs. -->
   <section id="welcome" class="screen">
     <header class="brand">
-      <div class="pebbles" aria-hidden="true"><i></i><i></i><i></i></div>
+      <img class="logo" src="icons/icon-192.png" alt="" width="64" height="64">
       <div class="brand-text">
         <h1>Typing Zen</h1>
         <p class="tag">Calm fingers, clever words.</p>
@@ -130,7 +130,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   <!-- HOME -->
   <section id="home" class="screen" hidden>
     <header class="brand">
-      <div class="pebbles" aria-hidden="true"><i></i><i></i><i></i></div>
+      <img class="logo" src="icons/icon-192.png" alt="" width="64" height="64">
       <div class="brand-text">
         <h1>Typing Zen</h1>
         <p class="tag">Calm fingers, clever words.</p>
@@ -299,7 +299,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       <button type="button" role="radio" aria-checked="true" data-upd="on">On</button>
       <button type="button" role="radio" aria-checked="false" data-upd="off">Off</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="87c745ee2f">1.19-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="9e03bb6931">1.20-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -392,10 +392,10 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <button type="button" class="sheet-done" id="boardDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=87c745ee2f"></script>
-<script src="words-da.js?v=87c745ee2f"></script>
-<script src="words-zh.js?v=87c745ee2f"></script>
-<script src="data.js?v=87c745ee2f"></script>
-<script src="app.js?v=87c745ee2f"></script>
+<script src="words.js?v=9e03bb6931"></script>
+<script src="words-da.js?v=9e03bb6931"></script>
+<script src="words-zh.js?v=9e03bb6931"></script>
+<script src="data.js?v=9e03bb6931"></script>
+<script src="app.js?v=9e03bb6931"></script>
 </body>
 </html>
