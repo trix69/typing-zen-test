@@ -29,7 +29,7 @@
   // this version it becomes the first user (v1 itself is left as it was).
   const KEY = "typingZen.v2-test";
   const OLD_KEY = "typingZen.v1-test";
-  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "au-female", practised: {}, practiseOrder: "order", learned: {}, streak: {}, lang: "en" });
+  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "au-female", practised: {}, practiseOrder: "order", learned: {}, streak: {}, lang: "en", byLang: {} });
   // Names start with a capital letter. A blank name stays blank: the welcome form asks for one.
   const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : ""; };
   const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -59,8 +59,38 @@
   // cloud a few seconds later (onSave is set in the Google section).
   let onSave = null;
   const save = () => { saveLocal(); if (onSave) onSave(); };
-  // A user's scores and history, as they are after Clear history or a change of language.
+  // A user's scores and history, as they are after Clear history or for a language not used yet.
   const FRESH = () => ({ bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], practised: {}, learned: {}, streak: {}, beeToday: null });
+  // Each language keeps its own history and voice (user's request, 2026-11-04): the profile holds the current
+  // language's, and profile.byLang[lang] the others', put away by stashLang() and brought back by restoreLang().
+  // Sessions carry their language, so a sync puts another device's sessions under the right one.
+  const LANG_KEYS = [...Object.keys(FRESH()), "voice"];
+  // A session with no language (saved before 2026-11-04) is English (user's request): untagged() files it there.
+  function untagged(p) {
+    const old = p.sessions.filter((x) => !x.lang);
+    if (!old.length) return false;
+    for (const x of old) x.lang = "en";
+    if ((p.lang || "en") === "en") return true;
+    p.byLang = p.byLang || {};
+    const en = p.byLang.en || (p.byLang.en = { ...FRESH(), voice: "au-female" });
+    en.sessions = [...(en.sessions || []), ...old].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).slice(-500);
+    p.sessions = p.sessions.filter((x) => x.lang !== "en");
+    return true;
+  }
+  function stashLang(p) {
+    untagged(p);
+    const L = p.lang || "en";
+    p.byLang = p.byLang || {};
+    p.byLang[L] = Object.fromEntries(LANG_KEYS.map((k) => [k, p[k]]));
+  }
+  function restoreLang(p, L) {
+    p.byLang = p.byLang || {};
+    const kept = p.byLang[L];
+    delete p.byLang[L];
+    Object.assign(p, FRESH(), { voice: DEFAULT_VOICE[L] }, kept || {}, { lang: L });
+  }
+  // Profiles saved before sessions had a language: filed once, and saved (only if something moved).
+  if (Object.values(store.users).map(untagged).some(Boolean)) saveLocal();
 
   // ---------- Language ----------
   // English or Danish, chosen per user in Settings (user's request, 2026-10-29). It sets the words
@@ -493,9 +523,13 @@
 
   // ---------- Building a round ----------
   const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  // Chinese words also carry their pinyin with tones and the typed form (the target): [.., pinyin, type].
-  const toWord = ([word, meaning, sentence, why, pinyin, type]) =>
-    ({ word, meaning, sentence, why: why === "simple, phonetic" ? "" : why, ...(type ? { pinyin, type } : {}) });
+  // Chinese words also carry their pinyin with tones and the typed form, one syllable per character with spaces
+  // between (words-zh.js: "peng you"). The spaces are only drawn (user's requests, 2026-11-04): the target is
+  // typed without them ("pengyou"), and `breaks` holds the letters after which the line leaves a gap.
+  const syllableBreaks = (spaced) => { const out = new Set(); let at = 0; for (const s of spaced.split(" ").slice(0, -1)) out.add((at += s.length) - 1); return out; };
+  const toWord = ([word, meaning, sentence, why, pinyin, spaced]) =>
+    ({ word, meaning, sentence, why: why === "simple, phonetic" ? "" : why,
+      ...(spaced ? { pinyin, type: spaced.replace(/ /g, ""), breaks: syllableBreaks(spaced) } : {}) });
   const typeOf = (w) => w.type || w.word; // what is typed: the word itself, or a Chinese word's pinyin
   const groups = () => ({ da: WORD_GROUPS_DA, zh: WORD_GROUPS_ZH }[wordLang()] || WORD_GROUPS);
   const allWords = () => groups().flatMap((g) => g.words.map(toWord));
@@ -604,7 +638,7 @@
     ["Punctuation", "Tegnsætning", () => pickN(W().phrases, 2).join(" ")],
     ["Every letter of the alphabet", "Alle alfabetets bogstaver", () => pick(W().pangrams)],
     ["Words from your level", "Ord fra dit niveau",
-      () => pickN(currentBucket().words.map((w) => w[5] || w[0]).filter((w) => /^[a-zæøå]{3,7}$/.test(w)), 4).join(" ")],
+      () => pickN(currentBucket().words.map((w) => (w[5] || w[0]).replace(/ /g, "")).filter((w) => /^[a-zæøå]{3,7}$/.test(w)), 4).join(" ")],
   ];
 
   function buildItems(mode) {
@@ -764,7 +798,8 @@
     Object.assign(game, { typed: "", posErr: 0, revealed: false, itemErr: 0, errAt: new Set(), hinted: false, itemStart: null, wait: false, leaving: null });
     $("#msg").className = "msg";
     $("#msg").innerHTML = "";
-    $("#line").className = "line" + (it.target.length > 24 ? " small" : "");
+    // A Chinese word takes the smaller line too: its card also has the characters and the pinyin hint.
+    $("#line").className = "line" + (it.target.length > 24 || it.type ? " small" : "");
     if (!game.endsAt) [...$("#trail").children].forEach((el, i) => { el.className = i < game.idx ? "done" : i === game.idx ? "now" : ""; });
     renderCard(it);
     renderLine();
@@ -789,12 +824,13 @@
     if (m === "warm") {
       card.innerHTML = `<div class="tagline">${escapeHtml(it.tag)}</div>`;
     } else if (it.type && (m === "spell" || m === "tricky")) {
-      // Chinese: the characters, their meaning and the example sentence with the word marked; the pinyin is what
-      // is typed, so it isn't shown.
+      // Chinese: the characters, their meaning, the example sentence with the word marked, and the pinyin with its
+      // tones just above the line, always shown as a hint (user's request, 2026-11-04): it is typed without tones.
       card.innerHTML = `<div class="hanzi" lang="zh-CN">${escapeHtml(it.word)}</div>
         <div class="meaning">${tx("It means", "Det betyder")} ${escapeHtml(it.meaning)}</div>
         ${zhSentence(it)}
-        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear the word", "Hør ordet")}</button>${it.sentence ? `<button class="ghost" data-say="sentence">🔊 ${tx("Hear the sentence", "Hør sætningen")}</button>` : ""}</div>`;
+        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear the word", "Hør ordet")}</button>${it.sentence ? `<button class="ghost" data-say="sentence">🔊 ${tx("Hear the sentence", "Hør sætningen")}</button>` : ""}</div>
+        <div class="pinyin hint-pinyin">${escapeHtml(it.pinyin)}</div>`;
     } else if (it.type) {
       // Chinese, shown (Word Garden, Practice): the characters, their pinyin with tones and the meaning.
       card.innerHTML = (m === "practise" ? `<div class="tagline">${tx(`Type it ${PRACTISE_REPS} times with no mistakes`, `Skriv det ${PRACTISE_REPS} gange uden fejl`)}</div>
@@ -854,6 +890,7 @@
         else if (it.hidden) { cls = i === n ? "blank cur" : "blank"; if (!(i === n && game.revealed)) ch = "_"; else cls = "hint cur"; }
         else cls = i === n ? "todo cur" : "todo";
         if (vocabAt >= 0 && i >= vocabAt && i < vocabAt + it.word.length) cls += " vocab";
+        if (it.breaks && it.breaks.has(i)) cls += " brk"; // a Chinese word: a gap after each syllable
         html += `<span class="${cls}">${vis(ch)}</span>`;
       }
     }
@@ -1052,7 +1089,7 @@
     const minutes = Math.round((Math.min(now, game.endsAt) - (game.endsAt - game.minutes * 60000)) / 60000);
     if (!finished && !game.firstTry.length && !game.struggled.length) return; // left before doing anything
     profile.sessions.push({
-      date: new Date().toISOString(), game: game.mode, level: currentBucket().name, minutes, length: game.minutes, finished,
+      date: new Date().toISOString(), game: game.mode, lang: profile.lang || "en", level: currentBucket().name, minutes, length: game.minutes, finished,
       firstTry: game.firstTry.length, struggled: game.struggled.length,
       firstTryWords: game.firstTry, struggledWords: game.struggled,
     });
@@ -1414,7 +1451,7 @@
     if ($("#clearYes").dataset.step === "1") return showClear(2);
     // Keeps the name, level, mute, key sound and voice; wipes scores, tricky words and the session history.
     // resetAt: a Google user's other devices drop everything from before it too.
-    Object.assign(profile, FRESH(), { resetAt: new Date().toISOString() });
+    Object.assign(profile, FRESH(), { byLang: {}, resetAt: new Date().toISOString() }); // every language's history
     save();
     showClear(0);
     renderHome();
@@ -1444,7 +1481,6 @@
     showLogout(0);
     showSync();
     showShare();
-    showLang(null);
     for (const b of $("#segLang").children) b.setAttribute("aria-checked", String(b.dataset.lang === wordLang()));
     for (const b of $("#segOrder").children) b.setAttribute("aria-checked", String(b.dataset.order === (profile.practiseOrder === "random" ? "random" : "order")));
     for (const b of $("#segUpd").children) b.setAttribute("aria-checked", String((b.dataset.upd === "on") === autoUpd()));
@@ -2179,36 +2215,66 @@
   // Syncing. Nothing is lost when two devices were used apart: sessions are joined (by when they ended),
   // best speed, stars and rounds keep the higher number, words seen, learned and practised are joined word by
   // word, and the rest (year, level, tricky words, sounds, voice, language) comes from whichever copy was
-  // changed last (`updated`). Clear history and a change of language set `resetAt`, which wins over anything
-  // older on every device.
+  // changed last (`updated`). Clear history sets `resetAt`, which wins over anything older on every device.
+  // Each language's history is kept apart (byLang): the cloud copy carries the other languages' scores (their
+  // sessions are in the sessions collection, tagged with their language), and a copy changed later in another
+  // language switches this device to it first, so scores of two languages are never mixed.
   const SYNC_MAX = ["bestWpm", "stars", "rounds"];
   const SYNC_LATEST = ["year", "bucket", "tricky", "streak", "beeToday", "mute", "keySound", "voice", "practiseOrder", "lang", "share", "shareAsk"];
   const SYNC_JOINED = ["seen", "learned", "practised"];
-  const pickShared = (p) => Object.fromEntries([...SYNC_MAX, ...SYNC_LATEST, ...SYNC_JOINED].filter((k) => k in p).map((k) => [k, p[k]]));
+  const pickShared = (p) => ({ ...Object.fromEntries([...SYNC_MAX, ...SYNC_LATEST, ...SYNC_JOINED].filter((k) => k in p).map((k) => [k, p[k]])),
+    byLang: Object.fromEntries(Object.entries(p.byLang || {}).map(([L, { sessions, ...rest }]) => [L, rest])) });
+  const allSessions = (p) => [...p.sessions, ...Object.values(p.byLang || {}).flatMap((b) => b.sessions || [])];
   function mergeProfile(p, r, sessions) {
     if (r && r.resetAt > (p.resetAt || "")) {
-      Object.assign(p, FRESH(), { resetAt: r.resetAt });
+      Object.assign(p, FRESH(), { byLang: {}, resetAt: r.resetAt });
       p.cloud.sentTo = r.resetAt;
     }
     // Cleared here since the cloud copy was saved: nothing in that copy comes back (Hermes R46.4).
     const stale = p.resetAt && (!r || (r.resetAt || "") < p.resetAt);
     const rp = (!stale && r && r.p) || {};
-    for (const k of SYNC_MAX) p[k] = Math.max(p[k] || 0, rp[k] || 0);
-    if (!stale && r && (r.updated || "") > (p.updated || "")) {
+    const newer = !stale && r && (r.updated || "") > (p.updated || "");
+    const theirLang = rp.lang || "en";
+    // Changed later in another language: switch to it here first (this language's history is put away).
+    if (newer && theirLang !== (p.lang || "en")) { stashLang(p); restoreLang(p, theirLang); }
+    // The other languages' scores: the later copy's, keeping this device's sessions for them.
+    p.byLang = p.byLang || {};
+    for (const [L, b] of Object.entries(rp.byLang || {})) {
+      if (L === p.lang || (!newer && p.byLang[L])) continue;
+      p.byLang[L] = { ...FRESH(), voice: DEFAULT_VOICE[L], ...b, sessions: (p.byLang[L] || {}).sessions || [] };
+    }
+    // Only a copy in this language adds to this language's scores.
+    const same = theirLang === (p.lang || "en");
+    for (const k of SYNC_MAX) p[k] = Math.max(p[k] || 0, same ? rp[k] || 0 : 0);
+    if (newer) {
       for (const k of SYNC_LATEST) if (k in rp) p[k] = rp[k];
       p.updated = r.updated;
     }
-    for (const [k, n] of Object.entries(rp.seen || {})) p.seen[k] = Math.max(p.seen[k] || 0, n);
-    for (const [w, d] of Object.entries(rp.learned || {})) if (!(p.learned[w] >= d)) p.learned[w] = d;
-    for (const day of Object.keys(rp.practised || {})) {
-      const d = practisedOn(p, day);
-      for (const [w, n] of Object.entries(practisedOn(rp, day))) d[w] = Math.max(d[w] || 0, n);
-      p.practised[day] = d;
+    // Words seen, learned and practised are joined only from a copy in this language; an older copy in another
+    // language gives only its sessions (below).
+    if (same) {
+      for (const [k, n] of Object.entries(rp.seen || {})) p.seen[k] = Math.max(p.seen[k] || 0, n);
+      for (const [w, d] of Object.entries(rp.learned || {})) if (!(p.learned[w] >= d)) p.learned[w] = d;
+      for (const day of Object.keys(rp.practised || {})) {
+        const d = practisedOn(p, day);
+        for (const [w, n] of Object.entries(practisedOn(rp, day))) d[w] = Math.max(d[w] || 0, n);
+        p.practised[day] = d;
+      }
     }
-    const byDate = new Map(p.sessions.map((x) => [x.date, x]));
-    for (const x of sessions) if (x && x.date && !byDate.has(x.date)) byDate.set(x.date, x);
-    p.sessions = [...byDate.values()].filter((x) => !p.resetAt || x.date >= p.resetAt)
-      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).slice(-500);
+    // Sessions go under their own language (one saved before 2026-11-04 has none: English).
+    const cur = p.lang || "en", lists = { [cur]: p.sessions };
+    for (const [L, b] of Object.entries(p.byLang)) lists[L] = b.sessions || [];
+    const known = new Set(allSessions(p).map((x) => x.date));
+    for (const x of sessions) {
+      if (!x || !x.date || known.has(x.date)) continue;
+      const L = x.lang || "en";
+      if (!lists[L]) { p.byLang[L] = { ...FRESH(), voice: DEFAULT_VOICE[L] }; lists[L] = p.byLang[L].sessions; }
+      lists[L].push(x);
+      known.add(x.date);
+    }
+    const tidy = (l) => l.filter((x) => !p.resetAt || x.date >= p.resetAt).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).slice(-500);
+    p.sessions = tidy(lists[cur]);
+    for (const [L, b] of Object.entries(p.byLang)) b.sessions = tidy(lists[L]);
   }
   let syncing = null, syncAgain = false, syncTimer = 0;
   // A change to a Google user: mark it newer and send it a few seconds later (several changes go together).
@@ -2230,7 +2296,8 @@
       const c = await userCloud(p.google.uid), { fs } = c;
       if (!c.auth.currentUser || c.auth.currentUser.uid !== p.google.uid) { cs.state = "out"; return; }
       const ref = fs.doc(c.db, CLOUD, p.google.uid), col = fs.collection(ref, "sessions");
-      const sentTo = cs.sentTo || "", mine = p.sessions.filter((x) => x.date > sentTo); // made here since the last sync
+      untagged(p); // tagged before they go up, so every device files them under English
+      const sentTo = cs.sentTo || "", mine = allSessions(p).filter((x) => x.date > sentTo); // made here since the last sync, any language
       const r = (await fs.getDoc(ref)).data() || null;
       const got = await fs.getDocs(fs.query(col, fs.where("up", ">", fs.Timestamp.fromMillis(cs.pulled || 0))));
       let pulled = cs.pulled || 0;
@@ -2248,7 +2315,7 @@
         for (const w of writes.slice(i, i + 400)) w(b);
         await b.commit();
       }
-      cs.sentTo = p.sessions.reduce((m, x) => (x.date > m ? x.date : m), sentTo);
+      cs.sentTo = allSessions(p).reduce((m, x) => (x.date > m ? x.date : m), sentTo);
       cs.pulled = pulled;
       cs.at = new Date().toISOString();
       cs.state = "ok";
@@ -2532,26 +2599,17 @@
   // ---------- Language setting ----------
   // Switching clears the user's history (user's request, 2026-10-29), so it asks first, in the language on
   // screen, when there is any history to lose.
-  const hasHistory = () => profile.rounds || profile.sessions.length || Object.keys(profile.tricky).length ||
-    Object.keys(profile.learned).length || Object.keys(profile.practised).length || Object.keys(profile.seen).length;
-  const LANG_NAME = { en: "English", da: "Dansk", zh: "中文 (Chinese)" };
   // Danish possessive: "Lukes", but "Klaus'".
   const owner = (n) => (/[sxz]$/i.test(n) ? n + "'" : n + "s");
-  function showLang(lang) {
-    $("#langConfirm").hidden = !lang;
-    if (!lang) return;
-    const n = profile.name;
-    $("#langAsk").textContent = tx(
-      `Switch ${n} to ${LANG_NAME[lang]}? This clears ${n}'s history: stars, best speed, tricky words, words to practise and the last 7 days. It can't be undone.`,
-      `Skift ${n} til ${LANG_NAME[lang]}? Det sletter ${owner(n)} historik: stjerner, bedste fart, svære ord, ord at øve og de sidste 7 dage. Det kan ikke fortrydes.`);
-    $("#langYes").textContent = tx("Yes, switch and clear", "Ja, skift og slet");
-    $("#langYes").dataset.lang = lang;
-    $("#langYes").focus();
-  }
+  // A user's language: this one's history is put away and the other's brought back (or started), nothing is
+  // cleared (user's request, 2026-11-04; it used to clear the history after a warning). The year and level stay.
   function switchLang(lang) {
-    Object.assign(profile, FRESH(), { lang, voice: DEFAULT_VOICE[lang], bucket: profile.year, resetAt: new Date().toISOString() });
+    stashLang(profile);
+    restoreLang(profile, lang);
     shownLang = store.lang = lang;
-    seenTick = 0;
+    seenTick = Math.max(0, ...Object.values(profile.seen));
+    // A sharer's board entry follows: it counts the words of the language now in use.
+    if (canShare() && profile.share === true) shareWrite(true);
     save();
     applyLang();
     syncSheet();
@@ -2575,13 +2633,10 @@
   }
   $("#segLang").addEventListener("click", (e) => {
     const b = e.target.closest("button");
-    if (!b || b.dataset.lang === wordLang()) return showLang(null);
+    if (!b || b.dataset.lang === wordLang()) return;
     if (!chosen) return setScreenLang(b.dataset.lang);
-    if (hasHistory()) showLang(b.dataset.lang);
-    else switchLang(b.dataset.lang);
+    switchLang(b.dataset.lang);
   });
-  $("#langYes").addEventListener("click", () => switchLang($("#langYes").dataset.lang));
-  $("#langNo").addEventListener("click", () => { showLang(null); $("#segLang [aria-checked=true]").focus(); });
 
   // index.html's own text, kept in English as it was at load, each piece swapped for its Danish in DA_TEXT
   // (data.js). Text the code writes later is left alone: it comes from tx().
