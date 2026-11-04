@@ -552,6 +552,14 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 }
 /* Phones: the game title gets its own row, so Home, the clock, the live speed and sound fit on one row below it. */
 @media (max-width: 480px) {
+  /* Chinese on a phone (Hermes R79.2): the two Hear buttons share a row and the characters are a little smaller,
+     so the card, line and keyboard fit like English's. */
+  .card:has(.hanzi) .tools { flex-wrap: nowrap; gap: 6px; }
+  .card:has(.hanzi) .tools button { font-size: 0.85rem; padding: 4px 9px; white-space: nowrap; }
+  .card .hanzi { font-size: clamp(24px, min(8vw, 4.5dvh), 32px); }
+  .card .hint-pinyin { font-size: 17px; margin-top: 0; line-height: 1.2; }
+  #play .card:has(.hanzi) { gap: 2px; padding-top: 6px; padding-bottom: 6px; }
+  .card:has(.hanzi) .meaning, .card:has(.hanzi) .zh-clue { font-size: 15px; line-height: 1.2; }
   .topbar { gap: 8px; }
   .topbar .title { flex-basis: 100%; order: -1; }
   .topbar .live { margin-left: auto; font-size: 0.85rem; }

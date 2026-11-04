@@ -1653,7 +1653,9 @@
     }).join("");
     if (c) $("#voiceSel").value = c.id;
     // Chrome lists no voices until its first voiceschanged, so the note waits until some voice is listed.
-    $("#voiceNote").textContent = tx("This device has no English voice, so words are read in its own voice.",
+    // Chinese (Hermes R79.1): say which voice is missing, and how to get one.
+    $("#voiceNote").textContent = ZH() ? "This device has no Chinese voice. Add a Mandarin voice in your device settings to hear the words."
+      : tx("This device has no English voice, so words are read in its own voice.",
       "Denne enhed har ingen dansk stemme, så ordene læses op med enhedens egen stemme.");
     $("#voiceNote").hidden = cs.length > 0 || !("speechSynthesis" in window && speechSynthesis.getVoices().length);
     // iPhone and iPad: before iOS 16.4 the silent switch still mutes the page.
