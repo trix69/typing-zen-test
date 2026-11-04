@@ -1493,8 +1493,9 @@
   }
   function askUpdate(live) {
     if (!autoUpd()) return;
-    // A name being typed on the welcome screen counts as busy too, so the question never takes the caret (Hermes R76.1).
-    const typing = document.activeElement === $("#newName") && !!$("#newName").value.trim();
+    // A half-filled first-visit form counts as busy too, focused or not, so the question never takes the caret or
+    // Enter from it (Hermes R76.1, R76.3); it asks on home once the user has joined.
+    const typing = !$("#welcome").hidden && !$("#intro-new").hidden && !!$("#newName").value.trim();
     const busy = document.hidden || typing || ($("#welcome").hidden && $("#home").hidden) || [...document.querySelectorAll(".sheet")].some((el) => !el.hidden);
     if (busy) { setTimeout(() => askUpdate(live), 5000); return; }
     updPending = live; updOffered = live.build || live.version;
