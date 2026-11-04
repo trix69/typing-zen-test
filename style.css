@@ -507,10 +507,12 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 /* Chinese (2026-11-04): the word in characters, large, in the system's Chinese font; its pinyin under it. */
 .hanzi { font: 600 clamp(32px, min(9vw, 6dvh), 80px)/1 "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; letter-spacing: .04em; }
 .pinyin { font: 500 22px var(--font-type); color: var(--muted); margin-top: 2px; }
-.hint-pinyin { margin-top: 6px; font-size: clamp(18px, 3dvh, 24px); color: var(--fg); } /* above the line: the tones say how it sounds */
 .zh-clue { font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; }
 .zh-clue mark { background: none; color: var(--accent); font-weight: 700; }
-.line .brk { margin-right: .5em; } /* the gap between a Chinese word's syllables: drawn, not typed */
+.line .brk { margin-right: .5em; }
+/* A Chinese word's tone marks, above the letters that carry them (the letters themselves stay hidden). */
+.line span[data-tone] { position: relative; }
+.line span[data-tone]::before { content: attr(data-tone); position: absolute; left: 0; right: 0; bottom: .02em; text-align: center; font: 700 1.1em/1 var(--font-body); color: var(--fg); pointer-events: none; } /* the gap between a Chinese word's syllables: drawn, not typed */
 /* Support (like Violin Toolkit): the coffee button, with its QR code beside it on a computer */
 .support { display: flex; align-items: center; gap: 14px; }
 .support-btn { flex: 1; }
@@ -557,7 +559,6 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
   .card:has(.hanzi) .tools { flex-wrap: nowrap; gap: 6px; }
   .card:has(.hanzi) .tools button { font-size: 0.85rem; padding: 4px 9px; white-space: nowrap; }
   .card .hanzi { font-size: clamp(24px, min(8vw, 4.5dvh), 32px); }
-  .card .hint-pinyin { font-size: 17px; margin-top: 0; line-height: 1.2; }
   #play .card:has(.hanzi) { gap: 2px; padding-top: 6px; padding-bottom: 6px; }
   .card:has(.hanzi) .meaning, .card:has(.hanzi) .zh-clue { font-size: 15px; line-height: 1.2; }
   .topbar { gap: 8px; }

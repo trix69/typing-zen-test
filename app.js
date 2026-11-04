@@ -527,9 +527,20 @@
   // between (words-zh.js: "peng you"). The spaces are only drawn (user's requests, 2026-11-04): the target is
   // typed without them ("pengyou"), and `breaks` holds the letters after which the line leaves a gap.
   const syllableBreaks = (spaced) => { const out = new Set(); let at = 0; for (const s of spaced.split(" ").slice(0, -1)) out.add((at += s.length) - 1); return out; };
+  // The tone mark of each typed letter that carries one, from the toned pinyin (user's request, 2026-11-04: only the
+  // tones are shown above the line, not the letters): 蜜蜂 mì fēng -> { 1: "ˋ", 3: "ˉ" } over "mifeng".
+  const TONE_MARK = { "\u0304": "ˉ", "\u0301": "ˊ", "\u030c": "ˇ", "\u0300": "ˋ" };
+  const tonesOf = (pinyin) => {
+    const out = {}; let i = 0;
+    for (const c of pinyin.normalize("NFD")) {
+      if (TONE_MARK[c]) out[i - 1] = TONE_MARK[c];
+      else if (/[a-z]/i.test(c)) i++;
+    }
+    return out;
+  };
   const toWord = ([word, meaning, sentence, why, pinyin, spaced]) =>
     ({ word, meaning, sentence, why: why === "simple, phonetic" ? "" : why,
-      ...(spaced ? { pinyin, type: spaced.replace(/ /g, ""), breaks: syllableBreaks(spaced) } : {}) });
+      ...(spaced ? { pinyin, type: spaced.replace(/ /g, ""), breaks: syllableBreaks(spaced), tones: tonesOf(pinyin) } : {}) });
   const typeOf = (w) => w.type || w.word; // what is typed: the word itself, or a Chinese word's pinyin
   const groups = () => ({ da: WORD_GROUPS_DA, zh: WORD_GROUPS_ZH }[wordLang()] || WORD_GROUPS);
   const allWords = () => groups().flatMap((g) => g.words.map(toWord));
@@ -824,13 +835,12 @@
     if (m === "warm") {
       card.innerHTML = `<div class="tagline">${escapeHtml(it.tag)}</div>`;
     } else if (it.type && (m === "spell" || m === "tricky")) {
-      // Chinese: the characters, their meaning, the example sentence with the word marked, and the pinyin with its
-      // tones just above the line, always shown as a hint (user's request, 2026-11-04): it is typed without tones.
+      // Chinese: the characters, their meaning and the example sentence with the word marked. The line shows each
+      // syllable's tone mark above its letter as a hint (renderLine), not the pinyin itself (user's requests, 2026-11-04).
       card.innerHTML = `<div class="hanzi" lang="zh-CN">${escapeHtml(it.word)}</div>
         <div class="meaning">${tx("It means", "Det betyder")} ${escapeHtml(it.meaning)}</div>
         ${zhSentence(it)}
-        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear the word", "Hør ordet")}</button>${it.sentence ? `<button class="ghost" data-say="sentence">🔊 ${tx("Hear the sentence", "Hør sætningen")}</button>` : ""}</div>
-        <div class="pinyin hint-pinyin">${escapeHtml(it.pinyin)}</div>`;
+        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear the word", "Hør ordet")}</button>${it.sentence ? `<button class="ghost" data-say="sentence">🔊 ${tx("Hear the sentence", "Hør sætningen")}</button>` : ""}</div>`;
     } else if (it.type) {
       // Chinese, shown (Word Garden, Practice): the characters, their pinyin with tones and the meaning.
       card.innerHTML = (m === "practise" ? `<div class="tagline">${tx(`Type it ${PRACTISE_REPS} times with no mistakes`, `Skriv det ${PRACTISE_REPS} gange uden fejl`)}</div>
@@ -891,7 +901,8 @@
         else cls = i === n ? "todo cur" : "todo";
         if (vocabAt >= 0 && i >= vocabAt && i < vocabAt + it.word.length) cls += " vocab";
         if (it.breaks && it.breaks.has(i)) cls += " brk"; // a Chinese word: a gap after each syllable
-        html += `<span class="${cls}">${vis(ch)}</span>`;
+        const tone = it.tones && it.tones[i] ? ` data-tone="${it.tones[i]}"` : ""; // and its tone mark above the letter
+        html += `<span class="${cls}"${tone}>${vis(ch)}</span>`;
       }
     }
     $("#line").innerHTML = html;
@@ -2402,8 +2413,9 @@
     return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-") + "|" + d.toDateString();
   });
   const canShare = () => !!(chosen && profile.google && cloudOn());
+  // The board counts the words tested in every language together (user's request, 2026-11-04).
   function myWeek(u) {
-    const totals = dayTotals(u), days = {};
+    const totals = dayTotals({ ...u, sessions: allSessions(u) }), days = {};
     for (const k of weekKeys()) { const [iso, ds] = k.split("|"); if (totals[ds] && totals[ds].words) days[iso] = totals[ds].words; }
     return days;
   }
