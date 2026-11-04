@@ -2611,8 +2611,8 @@
   });
 
   // ---------- Language setting ----------
-  // Switching clears the user's history (user's request, 2026-10-29), so it asks first, in the language on
-  // screen, when there is any history to lose.
+  // Settings > Language: a user's language switches at once and keeps each language's history apart (user's request,
+  // 2026-11-04; until then switching cleared it after a warning). With no one chosen, only the start screens change.
   // Danish possessive: "Lukes", but "Klaus'".
   const owner = (n) => (/[sxz]$/i.test(n) ? n + "'" : n + "s");
   // A user's language: this one's history is put away and the other's brought back (or started), nothing is
