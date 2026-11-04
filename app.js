@@ -2324,6 +2324,7 @@
     // (The language's time is kept back while a round holds the switch, so the next sync still makes it.)
     for (const [k, t] of Object.entries(theirStamps)) if (t > (p.setAt[k] || "") && !(k === "lang" && langWaits && playing)) p.setAt[k] = t;
     if (newer) p.updated = r.updated;
+    const held = langWaits && playing; // the switch waits for this round to end (see syncNow)
     // Sessions go under their own language (one saved before 2026-11-04 has none: English).
     const lists = { [cur]: p.sessions };
     for (const [L, b] of Object.entries(p.byLang)) lists[L] = b.sessions || [];
@@ -2338,6 +2339,7 @@
     const tidy = (l) => l.filter((x) => !p.resetAt || x.date >= p.resetAt).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).slice(-500);
     p.sessions = tidy(lists[cur]);
     for (const [L, b] of Object.entries(p.byLang)) b.sessions = tidy(lists[L]);
+    return held;
   }
   let syncing = null, syncAgain = false, syncTimer = 0;
   // A change to a Google user: mark it newer and send it a few seconds later (several changes go together).
@@ -2366,13 +2368,15 @@
       let pulled = cs.pulled || 0;
       const theirs = got.docs.map((d) => { const x = d.data(); pulled = Math.max(pulled, x.up ? x.up.toMillis() : 0); delete x.up; return x; });
       const lang = p.lang;
-      mergeProfile(p, r, theirs);
+      // A language switch held for a round (Hermes R84.1): the profile isn't written this time, or this device's copy
+      // would erase the other device's choice from the cloud before the next sync can follow it.
+      const held = mergeProfile(p, r, theirs);
       // Up: this device's new sessions, then the profile; a reset made here also clears the older sessions there.
       const writes = mine.filter((x) => !p.resetAt || x.date >= p.resetAt).map((x) => (b) => b.set(fs.doc(col, x.date), { ...x, up: fs.serverTimestamp() }));
       if (p.resetAt && (!r || (r.resetAt || "") < p.resetAt)) {
         for (const d of (await fs.getDocs(fs.query(col, fs.where("date", "<", p.resetAt)))).docs) writes.push((b) => b.delete(d.ref));
       }
-      writes.push((b) => b.set(ref, { p: pickShared(p), updated: p.updated || "", resetAt: p.resetAt || "" }));
+      if (!held) writes.push((b) => b.set(ref, { p: pickShared(p), updated: p.updated || "", resetAt: p.resetAt || "" }));
       for (let i = 0; i < writes.length; i += 400) {
         const b = fs.writeBatch(c.db);
         for (const w of writes.slice(i, i + 400)) w(b);
