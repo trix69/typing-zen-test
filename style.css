@@ -512,7 +512,14 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .line .brk { margin-right: .5em; }
 /* A Chinese word's tone marks, above the letters that carry them (the letters themselves stay hidden). */
 .line span[data-tone] { position: relative; }
-.line span[data-tone]::before { content: attr(data-tone); position: absolute; left: 0; right: 0; bottom: .02em; text-align: center; font: 700 1.1em/1 var(--font-body); color: var(--fg); pointer-events: none; } /* the gap between a Chinese word's syllables: drawn, not typed */
+/* Drawn, not typed: each tone is a small shape centred over its letter's dash, at the same height on every device
+   (a tone character took each device's own font and sat at a different height on the iPhone). */
+.line span[data-tone]::before { content: ""; position: absolute; left: 50%; bottom: .8em; width: .46em; height: .28em; transform: translateX(-50%);
+  background: var(--fg); -webkit-mask: var(--tone) center / contain no-repeat; mask: var(--tone) center / contain no-repeat; pointer-events: none; }
+.line span[data-tone="ˉ"] { --tone: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2010%206%27%3E%3Cpath%20d%3D%27M1.5%203H8.5%27%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E"); }
+.line span[data-tone="ˊ"] { --tone: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2010%206%27%3E%3Cpath%20d%3D%27M3%205L7.5%201%27%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E"); }
+.line span[data-tone="ˇ"] { --tone: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2010%206%27%3E%3Cpath%20d%3D%27M2%201.2L5%204.8L8%201.2%27%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E"); }
+.line span[data-tone="ˋ"] { --tone: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2010%206%27%3E%3Cpath%20d%3D%27M2.5%201L7%205%27%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%271.5%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%3C/svg%3E"); } /* the gap between a Chinese word's syllables: drawn, not typed */
 /* Support (like Violin Toolkit): the coffee button, with its QR code beside it on a computer */
 .support { display: flex; align-items: center; gap: 14px; }
 .support-btn { flex: 1; }
