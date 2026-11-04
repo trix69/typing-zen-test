@@ -6511,12 +6511,6 @@ const WORD_GROUPS = [
 "double letter (s)"
 ],
 [
-"center",
-"the middle (American spelling of centre)",
-"The city center was busy.",
-"soft c"
-],
-[
 "centre",
 "the middle",
 "The fountain is in the centre of town.",

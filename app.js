@@ -29,7 +29,7 @@
   // this version it becomes the first user (v1 itself is left as it was).
   const KEY = "typingZen.v2-test";
   const OLD_KEY = "typingZen.v1-test";
-  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "au-female", practised: {}, practiseOrder: "order", learned: {}, streak: {}, lang: "en", byLang: {} });
+  const DEFAULTS = () => ({ name: "", year: "", bucket: "Y1", bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], mute: false, keySound: "red", voice: "au-female", practised: {}, practiseOrder: "order", learned: {}, streak: {}, lang: "en", byLang: {}, setAt: {} });
   // Names start with a capital letter. A blank name stays blank: the welcome form asks for one.
   const tidyName = (n) => { n = (n || "").trim(); return n ? n[0].toUpperCase() + n.slice(1) : ""; };
   const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -59,6 +59,9 @@
   // cloud a few seconds later (onSave is set in the Google section).
   let onSave = null;
   const save = () => { saveLocal(); if (onSave) onSave(); };
+  // When each setting was last changed by hand (user's bug report, 2026-11-04: Practice order went back to In order
+  // after another device's sync). A sync keeps, setting by setting, the value changed last (mergeProfile).
+  const stamp = (...keys) => { profile.setAt = profile.setAt || {}; const t = new Date().toISOString(); for (const k of keys) profile.setAt[k] = t; };
   // A user's scores and history, as they are after Clear history or for a language not used yet.
   const FRESH = () => ({ bestWpm: 0, stars: 0, rounds: 0, tricky: {}, seen: {}, sessions: [], practised: {}, learned: {}, streak: {}, beeToday: null });
   // Each language keeps its own history and voice (user's request, 2026-11-04): the profile holds the current
@@ -66,9 +69,27 @@
   // Sessions carry their language, so a sync puts another device's sessions under the right one.
   const LANG_KEYS = [...Object.keys(FRESH()), "voice"];
   // A session with no language (saved before 2026-11-04) is English (user's request): untagged() files it there.
+  // A session whose words are Chinese characters is Chinese, whatever it says (1.18 could save a Chinese round as
+  // English when a sync switched the language mid-round: user's bug report, 2026-11-04).
+  const HAN = /\p{Script=Han}/u;
+  const isChinese = (x) => [...(x.firstTryWords || []), ...(x.struggledWords || [])].some((w) => HAN.test(w));
   function untagged(p) {
+    // Mis-filed Chinese sessions go back under Chinese first.
+    let moved = false;
+    p.byLang = p.byLang || {};
+    const lists = [[p.lang || "en", p, "sessions"], ...Object.entries(p.byLang).map(([L, b]) => [L, b, "sessions"])];
+    for (const [L, holder] of lists) {
+      if (L === "zh" || !holder.sessions) continue;
+      const wrong = holder.sessions.filter(isChinese);
+      if (!wrong.length) continue;
+      holder.sessions = holder.sessions.filter((x) => !isChinese(x));
+      for (const x of wrong) x.lang = "zh";
+      const zh = (p.lang || "en") === "zh" ? p : (p.byLang.zh || (p.byLang.zh = { ...FRESH(), voice: "zh-female" }));
+      zh.sessions = [...zh.sessions, ...wrong].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).slice(-500);
+      moved = true;
+    }
     const old = p.sessions.filter((x) => !x.lang);
-    if (!old.length) return false;
+    if (!old.length) return moved;
     for (const x of old) x.lang = "en";
     if ((p.lang || "en") === "en") return true;
     p.byLang = p.byLang || {};
@@ -489,7 +510,9 @@
   // Sound is always on in Spelling Bee (it is spoken, and its mute button is hidden) and while Settings is open
   // (to try voices and key sounds). profile.mute itself is left as it was, so it applies again everywhere else
   // (user's request, 2026-10-28).
-  const muted = () => profile.mute && !(game && game.mode === "spell" && !$("#play").hidden) && $("#sheet").hidden;
+  // Spelling Bee and Practice always have sound (Practice: user's report, 2026-11-04, no word or key sound there when
+  // the account's mute was on): they are about hearing the word. Mute still applies to the other games.
+  const muted = () => profile.mute && !(game && (game.mode === "spell" || game.mode === "practise") && !$("#play").hidden) && $("#sheet").hidden;
   let speechRun = 0;
   let speakTimer = 0; // the short wait before a new item is spoken; cleared by stopSpeech()
   // texts are said one after another with a 1 s gap; sayThenSpell() uses a shorter one.
@@ -710,7 +733,9 @@
         // Progress is kept (user's request, 2026-10-28): each word starts from its saved clean goes, and words
         // already done are left out. A day can only be started while it has a word left (home and View stats both
         // check, R69/R51.1), so the "all done: run every word again from 0" fallback below no longer happens.
-        const known = new Map(allWords().map((w) => [w.word, w]));
+        // Every language's words, so a word always finds its own entry (a Chinese one its pinyin).
+        const known = new Map([WORD_GROUPS, WORD_GROUPS_DA, WORD_GROUPS_ZH].flatMap((gs) => gs.flatMap((g) => g.words.map(toWord))).map((w) => [w.word, w]));
+        for (const w of allWords()) known.set(w.word, w); // this language's entry first where a word is in two
         const words = missedByDay(profile)[practiceDay] || [];
         const saved = practisedOn(profile, practiceDay);
         const left = words.filter((w) => (saved[w] || 0) < PRACTISE_REPS);
@@ -732,14 +757,14 @@
     loadSwitch(currentSwitch()); // fetch the key sounds now (a click), so the first key isn't silent
     const items = buildItems(mode);
     if (!items.length) return;
-    game = { mode, length, items, batch: 0, missedIn: {}, idx: 0, correct: 0, errors: 0, ms: 0, missed: new Set(), firstTry: [], struggled: [], over: false,
+    game = { mode, length, items, lang: profile.lang || "en", batch: 0, missedIn: {}, idx: 0, correct: 0, errors: 0, ms: 0, missed: new Set(), firstTry: [], struggled: [], over: false,
       res: mode === "spell" ? resultsIn(profile, currentBucket().name) : {}, newMastered: new Set() };
     game.minutes = mode === "spell" ? LENGTHS[length] || LENGTHS.long : 0;
     if (game.minutes) game.endsAt = Date.now() + game.minutes * 60000;
     $("#modeTitle").textContent = tx(...TITLES[mode]);
     $("#trail").innerHTML = game.endsAt ? '<i class="time"><b></b></i>' : items.map(() => "<i></i>").join("");
     $("#clock").hidden = !game.endsAt;
-    $("#muteBtn").hidden = mode === "spell";
+    $("#muteBtn").hidden = mode === "spell" || mode === "practise";
     show("play");
     // Phones type on their own keyboard by default (user's request, like TypingClub); tablets show the
     // on-screen one (see TABLET). This runs inside the tap that started the game, which iOS needs before it
@@ -1100,7 +1125,7 @@
     const minutes = Math.round((Math.min(now, game.endsAt) - (game.endsAt - game.minutes * 60000)) / 60000);
     if (!finished && !game.firstTry.length && !game.struggled.length) return; // left before doing anything
     profile.sessions.push({
-      date: new Date().toISOString(), game: game.mode, lang: profile.lang || "en", level: currentBucket().name, minutes, length: game.minutes, finished,
+      date: new Date().toISOString(), game: game.mode, lang: game.lang || profile.lang || "en", level: currentBucket().name, minutes, length: game.minutes, finished,
       firstTry: game.firstTry.length, struggled: game.struggled.length,
       firstTryWords: game.firstTry, struggledWords: game.struggled,
     });
@@ -1369,7 +1394,7 @@
   }
   $("#levels").addEventListener("click", (e) => {
     const b = e.target.closest(".level");
-    if (b && !b.disabled) { profile.bucket = b.dataset.bucket; save(); renderHome(); }
+    if (b && !b.disabled) { profile.bucket = b.dataset.bucket; stamp("bucket"); save(); renderHome(); }
   });
   document.querySelectorAll(".mode").forEach((b) => b.addEventListener("click", () => {
     b.blur();
@@ -1624,7 +1649,7 @@
   // Practice order (user's request, 2026-10-28): the day's words in the order they were missed, or shuffled.
   $("#segOrder").addEventListener("click", (e) => {
     const b = e.target.closest("button");
-    if (b) { profile.practiseOrder = b.dataset.order; save(); syncSheet(); }
+    if (b) { profile.practiseOrder = b.dataset.order; stamp("practiseOrder"); save(); syncSheet(); }
   });
   $("#segApp").addEventListener("click", (e) => {
     const b = e.target.closest("button");
@@ -1676,13 +1701,14 @@
     $("#voiceRow").hidden = !("speechSynthesis" in window);
   }
   if ("speechSynthesis" in window && speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged", fillVoices);
-  $("#voiceSel").addEventListener("change", (e) => { profile.voice = e.target.value; save(); fillVoices(); speak(sample()); });
+  $("#voiceSel").addEventListener("change", (e) => { profile.voice = e.target.value; stamp("voice." + (profile.lang || "en")); save(); fillVoices(); speak(sample()); });
   $("#voiceTry").addEventListener("click", () => speak(sample()));
   // Key sound: choosing one plays a sample of it.
   $("#segSound").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
     profile.keySound = b.dataset.sound;
+    stamp("keySound");
     save();
     syncSheet();
     // A sample: a letter's press, then its release.
@@ -1694,6 +1720,7 @@
     const b = e.target.closest("button");
     if (!b) return;
     profile.year = b.dataset.year;
+    stamp("year", "bucket");
     // Keep the chosen level if it's still open, otherwise practise the new year.
     if (!unlocked(profile.year).includes(profile.bucket)) profile.bucket = profile.year;
     save();
@@ -1705,7 +1732,7 @@
   $("#homeBtn").addEventListener("click", () => show("home"));
   $("#againBtn").addEventListener("click", () => start(game.mode, game.length));
   $("#muteBtn").addEventListener("click", (e) => {
-    profile.mute = !profile.mute; save();
+    profile.mute = !profile.mute; stamp("mute"); save();
     showSoundIcon();
     e.currentTarget.blur();
   });
@@ -1916,7 +1943,15 @@
     showPanel("back", keep);
   }
   // The text of the "Welcome back" panel and the user list, written again when the start screens' language changes.
-  function fillBack(last) {
+  // The stats card shows the history of the language on screen (user's request, 2026-11-04): the user's own, or, when
+  // the start screens were switched to another language before choosing anyone, that language's put-away history.
+  function inShownLang(u) {
+    const L = wordLang();
+    if ((u.lang || "en") === L) return u;
+    return { ...u, ...FRESH(), ...((u.byLang || {})[L] || {}), lang: L };
+  }
+  function fillBack(user) {
+    const last = inShownLang(user);
     $("#backName").textContent = last.name;
     renderWeek(last);
     $("#continueBtn").textContent = tx(`Continue as ${last.name}`, `Fortsæt som ${last.name}`);
@@ -2019,7 +2054,7 @@
   // the words that need more practice (those with their Practise button), in the week chart's two colours.
   const missedSheet = $("#missedSheet");
   function openMissed() {
-    const u = store.users[store.current];
+    const u = inShownLang(store.users[store.current]);
     const today = new Date().toDateString(), yesterday = new Date(Date.now() - 864e5).toDateString();
     const chips = (l) => `<div class="tricky-list">${l}</div>`;
     $("#missedDays").innerHTML = wordsByDay(u).map(({ day, first, again: words, tested }) => {
@@ -2230,10 +2265,15 @@
   // word, and the rest (year, level, tricky words, sounds, voice, language) comes from whichever copy was
   // changed last (`updated`). Clear history sets `resetAt`, which wins over anything older on every device.
   // Each language's history is kept apart (byLang): the cloud copy carries the other languages' scores (their
-  // sessions are in the sessions collection, tagged with their language), and a copy changed later in another
-  // language switches this device to it first, so scores of two languages are never mixed.
+  // sessions are in the sessions collection, tagged with their language). Each language's scores merge only into the
+  // same language; a device's language changes only when it was chosen later on another device.
   const SYNC_MAX = ["bestWpm", "stars", "rounds"];
-  const SYNC_LATEST = ["year", "bucket", "tricky", "streak", "beeToday", "mute", "keySound", "voice", "practiseOrder", "lang", "share", "shareAsk"];
+  // From the later copy: settings shared by every language, and this language's own (its voice too). The language
+  // itself is per device (user's bug report, 2026-11-04: a Chinese iPhone flipped to English when the same account
+  // was used in English elsewhere); `lang` is sent only so that a new device starts in the account's last language.
+  const SYNC_SHARED = ["year", "bucket", "mute", "keySound", "practiseOrder", "share", "shareAsk"];
+  const SYNC_PER_LANG = ["tricky", "streak", "beeToday", "voice"];
+  const SYNC_LATEST = [...SYNC_SHARED, ...SYNC_PER_LANG, "lang", "setAt"]; // what the cloud copy carries
   const SYNC_JOINED = ["seen", "learned", "practised"];
   const pickShared = (p) => ({ ...Object.fromEntries([...SYNC_MAX, ...SYNC_LATEST, ...SYNC_JOINED].filter((k) => k in p).map((k) => [k, p[k]])),
     byLang: Object.fromEntries(Object.entries(p.byLang || {}).map(([L, { sessions, ...rest }]) => [L, rest])) });
@@ -2248,39 +2288,49 @@
     const rp = (!stale && r && r.p) || {};
     const newer = !stale && r && (r.updated || "") > (p.updated || "");
     const theirLang = rp.lang || "en";
-    // Changed later in another language: switch to it here first (this language's history is put away).
-    if (newer && theirLang !== (p.lang || "en")) { stashLang(p); restoreLang(p, theirLang); }
-    // The other languages' scores: the later copy's, keeping this device's sessions for them.
     p.byLang = p.byLang || {};
-    for (const [L, b] of Object.entries(rp.byLang || {})) {
-      if (L === p.lang || (!newer && p.byLang[L])) continue;
-      p.byLang[L] = { ...FRESH(), voice: DEFAULT_VOICE[L], ...b, sessions: (p.byLang[L] || {}).sessions || [] };
-    }
-    // Only a copy in this language adds to this language's scores.
-    const same = theirLang === (p.lang || "en");
-    for (const k of SYNC_MAX) p[k] = Math.max(p[k] || 0, same ? rp[k] || 0 : 0);
-    if (newer) {
-      for (const k of SYNC_LATEST) if (k in rp) p[k] = rp[k];
-      p.updated = r.updated;
-    }
-    // Words seen, learned and practised are joined only from a copy in this language; an older copy in another
-    // language gives only its sessions (below).
-    if (same) {
-      for (const [k, n] of Object.entries(rp.seen || {})) p.seen[k] = Math.max(p.seen[k] || 0, n);
-      for (const [w, d] of Object.entries(rp.learned || {})) if (!(p.learned[w] >= d)) p.learned[w] = d;
-      for (const day of Object.keys(rp.practised || {})) {
-        const d = practisedOn(p, day);
-        for (const [w, n] of Object.entries(practisedOn(rp, day))) d[w] = Math.max(d[w] || 0, n);
-        p.practised[day] = d;
+    // A setting takes the other copy's value when it was changed there later (user's request, 2026-11-04: every setting
+    // follows the cloud when the cloud's is newer); with no times on either side (set before 2026-11-04), the copy
+    // changed last wins as before.
+    p.setAt = p.setAt || {};
+    const theirStamps = rp.setAt || {};
+    const later = (k, newer) => (theirStamps[k] || p.setAt[k] ? (theirStamps[k] || "") > (p.setAt[k] || "") : newer);
+    // The language too, but only when it was chosen later there (never just because the copy is newer: that flipped a
+    // Chinese device to English in 1.18), and not in the middle of a round on this device (it follows after).
+    const playing = p === profile && game && !game.over;
+    const langWaits = (theirStamps.lang || "") > (p.setAt.lang || "") && theirLang !== (p.lang || "en");
+    if (langWaits && !playing) { stashLang(p); restoreLang(p, theirLang); }
+    const cur = p.lang || "en";
+    // The cloud copy holds its device's language at the top and the others in byLang. Each language's part is merged
+    // into the same language here: this device's current one at the top, the others in p.byLang.
+    const parts = { ...(rp.byLang || {}) };
+    if (Object.keys(rp).length) parts[theirLang] = Object.fromEntries(LANG_KEYS.filter((k) => k !== "sessions" && k in rp).map((k) => [k, rp[k]]));
+    for (const [L, b] of Object.entries(parts)) {
+      if (!b) continue;
+      const mine = L === cur ? p : (p.byLang[L] || (p.byLang[L] = { ...FRESH(), voice: DEFAULT_VOICE[L] }));
+      for (const k of SYNC_MAX) mine[k] = Math.max(mine[k] || 0, b[k] || 0);
+      if (newer) for (const k of ["tricky", "streak", "beeToday"]) if (k in b) mine[k] = b[k];
+      if ("voice" in b && later("voice." + L, newer)) mine.voice = b.voice; // a voice chosen later on another device
+      mine.seen = mine.seen || {}; mine.learned = mine.learned || {}; mine.practised = mine.practised || {};
+      for (const [k, n] of Object.entries(b.seen || {})) mine.seen[k] = Math.max(mine.seen[k] || 0, n);
+      for (const [w, d] of Object.entries(b.learned || {})) if (!(mine.learned[w] >= d)) mine.learned[w] = d;
+      for (const day of Object.keys(b.practised || {})) {
+        const d = practisedOn(mine, day);
+        for (const [w, n] of Object.entries(practisedOn(b, day))) d[w] = Math.max(d[w] || 0, n);
+        mine.practised[day] = d;
       }
     }
+    for (const k of SYNC_SHARED) if (k in rp && later(k, newer)) p[k] = rp[k];
+    // (The language's time is kept back while a round holds the switch, so the next sync still makes it.)
+    for (const [k, t] of Object.entries(theirStamps)) if (t > (p.setAt[k] || "") && !(k === "lang" && langWaits && playing)) p.setAt[k] = t;
+    if (newer) p.updated = r.updated;
     // Sessions go under their own language (one saved before 2026-11-04 has none: English).
-    const cur = p.lang || "en", lists = { [cur]: p.sessions };
+    const lists = { [cur]: p.sessions };
     for (const [L, b] of Object.entries(p.byLang)) lists[L] = b.sessions || [];
     const known = new Set(allSessions(p).map((x) => x.date));
     for (const x of sessions) {
       if (!x || !x.date || known.has(x.date)) continue;
-      const L = x.lang || "en";
+      const L = isChinese(x) ? "zh" : x.lang || "en";
       if (!lists[L]) { p.byLang[L] = { ...FRESH(), voice: DEFAULT_VOICE[L] }; lists[L] = p.byLang[L].sessions; }
       lists[L].push(x);
       known.add(x.date);
@@ -2422,6 +2472,14 @@
   // Puts this user's week on the board (or takes it off). Quietly does nothing offline or signed out.
   async function shareWrite(on, u = profile) {
     if (!u.google || !cloudOn()) return false;
+    // The entry is this user's words over every device, so it is written only after a sync has brought the other
+    // devices' sessions here (user's report, 2026-11-04: 100+ words dropped to 35 after a round on another device).
+    // A user not chosen yet (the stats card) isn't synced: the board is read, the entry left as it is.
+    if (on) {
+      if (u !== profile || !chosen) return false;
+      await syncNow();
+      if ((u.cloud || {}).state !== "ok") return false;
+    }
     try {
       const c = await userCloud(u.google.uid);
       if (!c.auth.currentUser || c.auth.currentUser.uid !== u.google.uid) return false;
@@ -2463,13 +2521,14 @@
   }
   $("#shareYes").addEventListener("click", async () => {
     profile.share = true;
+    stamp("share");
     save();
     closeShare();
     $("#boardBtn").hidden = false;
     await openBoard();
   });
   $("#shareNo").addEventListener("click", () => closeShare()); // asked again next time
-  $("#shareNever").addEventListener("click", () => { profile.shareAsk = false; save(); closeShare(); });
+  $("#shareNever").addEventListener("click", () => { profile.shareAsk = false; stamp("shareAsk"); save(); closeShare(); });
   // After a Spelling Bee: share this week's count if the user shares, else ask (unless told not to).
   function afterBee(done) {
     cancelAsk();
@@ -2551,6 +2610,7 @@
     if (!b || b.disabled) return;
     const on = b.dataset.share === "yes";
     profile.share = on;
+    stamp("share", "shareAsk");
     if (!on) profile.shareAsk = false; // a clear No in Settings: don't ask after each Bee either
     save();
     showShare();
@@ -2620,6 +2680,7 @@
   function switchLang(lang) {
     stashLang(profile);
     restoreLang(profile, lang);
+    stamp("lang"); // so the user's other devices follow this choice
     shownLang = store.lang = lang;
     seenTick = Math.max(0, ...Object.values(profile.seen));
     // A sharer's board entry follows: it counts the words of the language now in use.
