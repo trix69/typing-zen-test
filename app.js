@@ -70,9 +70,15 @@
   // in that language before anyone is chosen, and a new user made there starts in it (user's request: #dk).
   // The start screens use store.lang: the language picked in Settings there, or else the last chosen user's
   // (Hermes R39.1). It is kept in step in useProfile() and switchLang().
-  const HASH_LANG = { "#dk": "da", "#da": "da", "#en": "en" }[location.hash.toLowerCase()] || null;
+  // Chinese (user's request, 2026-11-04): words-zh.js's words, shown in characters and typed as pinyin without
+  // tones on the English keyboard, with a Mandarin voice. The page's own text stays English (tx() gives English
+  // for "zh"); only the words, the voices and the typing change.
+  const HASH_LANG = { "#dk": "da", "#da": "da", "#en": "en", "#zh": "zh", "#cn": "zh" }[location.hash.toLowerCase()] || null;
   let shownLang = HASH_LANG || store.lang || (store.users[store.current] ? profile.lang : "en");
   const DA = () => shownLang === "da";
+  const ZH = () => shownLang === "zh";
+  // The language whose words, voices and layout are used: "en", "da" or "zh".
+  const wordLang = () => (shownLang === "da" || shownLang === "zh" ? shownLang : "en");
   const tx = (en, da) => (DA() ? da : en);
 
   // ---------- Keyboard model ----------
@@ -384,25 +390,33 @@
       names: ["sara", "microsoft christel", "microsoft helle", "helle"] },
     { id: "da-male", accent: "Danish", kind: "male", lang: "da-DK",
       names: ["magnus", "microsoft jeppe", "jeppe"] },
+  ],
+  // Mandarin (Putonghua): Apple's Tingting / Lili, Google's 普通话, Microsoft's Xiaoxiao / Huihui and Yunxi / Kangkang.
+  zh: [
+    { id: "zh-female", accent: "Mandarin", kind: "female", lang: "zh-CN",
+      names: ["tingting", "ting-ting", "lili", "google 普通话", "microsoft xiaoxiao", "microsoft huihui", "xiaoxiao", "huihui"] },
+    { id: "zh-male", accent: "Mandarin", kind: "male", lang: "zh-CN",
+      names: ["microsoft yunxi", "microsoft kangkang", "yunxi", "kangkang", "li-mu", "yu-shu"] },
   ] };
-  const DEFAULT_VOICE = { en: "au-female", da: "da-female" };
+  const DEFAULT_VOICE = { en: "au-female", da: "da-female", zh: "zh-female" };
   // Earlier test builds saved "daniel", "samantha" or "karen".
   const OLD_VOICE = { daniel: "gb-male", samantha: "us-female", karen: "au-female" };
   // When a device has none of a choice's voices, the list is topped up with its other English voices: British
   // women first (the default Google voice on Windows), then any. Their kind is guessed from the name.
-  const FEMALE = /female|samantha|karen|catherine|natasha|zira|jenny|aria|hazel|susan|sonia|libby|serena|kate|moira|tessa|ava\b|allison|google us english|sara|helle|christel/i;
-  const MALE = /\bmale\b|daniel|ryan|george|thomas|david|mark\b|guy\b|william|arthur|oliver|rishi|\blee\b|james|magnus|jeppe/i;
+  const FEMALE = /female|tingting|ting-ting|lili|meijia|mei-jia|xiaoxiao|huihui|yaoyao|samantha|karen|catherine|natasha|zira|jenny|aria|hazel|susan|sonia|libby|serena|kate|moira|tessa|ava\b|allison|google us english|sara|helle|christel/i;
+  const MALE = /\bmale\b|yunxi|kangkang|li-mu|yu-shu|daniel|ryan|george|thomas|david|mark\b|guy\b|william|arthur|oliver|rishi|\blee\b|james|magnus|jeppe/i;
   const ACCENTS = { "en-GB": "British", "en-US": "American", "en-AU": "Australian", "en-IE": "Irish", "en-IN": "Indian",
-    "en-ZA": "South African", "en-NZ": "New Zealand", "en-CA": "Canadian", "da-DK": "Danish" };
+    "en-ZA": "South African", "en-NZ": "New Zealand", "en-CA": "Canadian", "da-DK": "Danish", "zh-CN": "Mandarin", "zh-TW": "Mandarin (Taiwan)" };
   const langOf = (v) => v.lang.replace("_", "-");
   // The device's voices in the user's language.
   const langVoices = () => ("speechSynthesis" in window ? speechSynthesis.getVoices() : [])
-    .filter((v) => (DA() ? /^da([-_]|$)/i : /^en([-_]|$)/i).test(v.lang));
+    // Chinese: Mandarin voices only (zh-CN, zh-TW, cmn), never Cantonese (zh-HK, yue), which reads characters differently.
+    .filter((v) => ({ da: /^da([-_]|$)/i, zh: /^(zh|cmn)([-_](cn|tw|hans|hant|sg)|$)/i }[wordLang()] || /^en([-_]|$)/i).test(v.lang));
   const startsWith = (v, n) => new RegExp("^" + n + "\\b", "i").test(v.name);
   // The three entries this device offers: [{ id, voice, label }], at most three, no voice twice.
   function voiceChoices(vs = langVoices()) {
     const used = new Set(), out = [];
-    for (const x of VOICES[DA() ? "da" : "en"]) {
+    for (const x of VOICES[wordLang()]) {
       let v = null;
       for (const n of x.names) {
         const named = vs.filter((w) => !used.has(w) && startsWith(w, n));
@@ -425,7 +439,7 @@
     return out;
   }
   // The name shown in Settings: "Microsoft Ryan Online (Natural) - English (United Kingdom)" → "Ryan".
-  const shortName = (v) => v.name.replace(/\s+-\s+(English|Danish|Dansk).*$/, "").replace(/^Microsoft\s+/, "").replace(/\s+Online \(Natural\)$/, "");
+  const shortName = (v) => v.name.replace(/\s+-\s+(English|Danish|Dansk|Chinese).*$/, "").replace(/^Microsoft\s+/, "").replace(/\s+Online \(Natural\)$/, "");
   const extraVoice = (v) => ({ id: v.voiceURI, voice: v, accent: ACCENTS[langOf(v)] || v.lang,
     kind: FEMALE.test(v.name) ? "female" : MALE.test(v.name) ? "male" : "" });
   // The saved choice if this device can meet it, even when a changed voice list (Edge's online voices arriving,
@@ -435,7 +449,7 @@
     const want = OLD_VOICE[profile.voice] || profile.voice;
     // A voice saved by its voiceURI (earlier builds) that is already one of the three is that entry, not a 4th.
     const kept = !cs.some((c) => c.id === want || c.voice.voiceURI === want) && langVoices().find((v) => v.voiceURI === want);
-    return cs.find((c) => c.id === want || c.voice.voiceURI === want) || (kept ? extraVoice(kept) : null) || cs.find((c) => c.id === DEFAULT_VOICE[DA() ? "da" : "en"]) ||
+    return cs.find((c) => c.id === want || c.voice.voiceURI === want) || (kept ? extraVoice(kept) : null) || cs.find((c) => c.id === DEFAULT_VOICE[wordLang()]) ||
       cs.find((c) => c.kind === "female" && langOf(c.voice) === "en-GB") || cs.find((c) => c.kind === "female") || cs[0] || null;
   }
   function pickVoice() {
@@ -450,7 +464,8 @@
   let speakTimer = 0; // the short wait before a new item is spoken; cleared by stopSpeech()
   // texts are said one after another with a 1 s gap; sayThenSpell() uses a shorter one.
   const speak = (...texts) => speakGap(1000, ...texts);
-  function speakGap(gap, ...texts) {
+  function speakGap(gap, ...all) {
+    const texts = all.filter(Boolean); // a Chinese word has no sentence
     const run = ++speechRun;
     if (muted() || !("speechSynthesis" in window)) return;
     speechSynthesis.cancel();
@@ -459,7 +474,7 @@
       const u = new SpeechSynthesisUtterance(texts[i]);
       const voice = pickVoice();
       if (voice) u.voice = voice;
-      u.lang = voice ? voice.lang : tx("en-GB", "da-DK");
+      u.lang = voice ? voice.lang : ZH() ? "zh-CN" : tx("en-GB", "da-DK");
       u.rate = 0.85;
       u.onend = () => setTimeout(() => say(i + 1), gap);
       speechSynthesis.speak(u);
@@ -472,24 +487,28 @@
   const spelledOut = (w) => [...w].map((c) => (c === "'" ? tx("apostrophe", "apostrof") : c === "-" ? tx("hyphen", "bindestreg")
     : c === " " ? tx("space", "mellemrum") : c.toUpperCase())).join(" ");
   // Practice: the word, then its spelling 0.3 s later (user's request, 2026-11-01: a shorter pause than 1 s).
-  const sayThenSpell = (w) => speakGap(300, w, spelledOut(w));
+  // In Chinese the word is said again instead: a Mandarin voice reading pinyin letters makes no sense.
+  const sayThenSpell = (w) => (ZH() ? speakGap(600, w, w) : speakGap(300, w, spelledOut(w)));
   const stopSpeech = () => { clearTimeout(speakTimer); speechRun++; if ("speechSynthesis" in window) speechSynthesis.cancel(); };
 
   // ---------- Building a round ----------
   const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  const toWord = ([word, meaning, sentence, why]) => ({ word, meaning, sentence, why: why === "simple, phonetic" ? "" : why });
-  const groups = () => (DA() ? WORD_GROUPS_DA : WORD_GROUPS);
+  // Chinese words also carry their pinyin with tones and the typed form (the target): [.., pinyin, type].
+  const toWord = ([word, meaning, sentence, why, pinyin, type]) =>
+    ({ word, meaning, sentence, why: why === "simple, phonetic" ? "" : why, ...(type ? { pinyin, type } : {}) });
+  const typeOf = (w) => w.type || w.word; // what is typed: the word itself, or a Chinese word's pinyin
+  const groups = () => ({ da: WORD_GROUPS_DA, zh: WORD_GROUPS_ZH }[wordLang()] || WORD_GROUPS);
   const allWords = () => groups().flatMap((g) => g.words.map(toWord));
   // One level per school year (wordlist/years.txt), with hand-picked sample words.
   // `name` matches words.js and the saved level; `label` is what the button shows. In Danish the years are
   // Danish school classes of the same age (Year 1 is 0. klasse), with words-da.js's words.
   const BUCKETS = [
-    { name: "Y1", en: "Year 1", da: "0. klasse", sample: ["dog, house, friend", "kat, hus, ven"] },
-    { name: "Y2", en: "Year 2", da: "1. klasse", sample: ["because, people, water", "fordi, hjerte, hvalp"] },
-    { name: "Y3", en: "Year 3", da: "2. klasse", sample: ["answer, remember, young", "pludselig, nysgerrig, fløjte"] },
-    { name: "Y4", en: "Year 4", da: "3. klasse", sample: ["believe, surprise, library", "hemmelighed, chokolade, bjerg"] },
-    { name: "Y5", en: "Year 5", da: "4. klasse", sample: ["queue, receive, doubt", "kø, modtage, tvivl"] },
-    { name: "Y6", en: "Year 6", da: "5. klasse", sample: ["necessary, rhythm, conscience", "rytme, succes, champignon"] },
+    { name: "Y1", en: "Year 1", da: "0. klasse", sample: ["dog, house, friend", "kat, hus, ven", "你好, 朋友, 苹果"] },
+    { name: "Y2", en: "Year 2", da: "1. klasse", sample: ["because, people, water", "fordi, hjerte, hvalp", "时间, 帮助, 漂亮"] },
+    { name: "Y3", en: "Year 3", da: "2. klasse", sample: ["answer, remember, young", "pludselig, nysgerrig, fløjte", "世界, 勇敢, 发现"] },
+    { name: "Y4", en: "Year 4", da: "3. klasse", sample: ["believe, surprise, library", "hemmelighed, chokolade, bjerg", "历史, 合作, 风景"] },
+    { name: "Y5", en: "Year 5", da: "4. klasse", sample: ["queue, receive, doubt", "kø, modtage, tvivl", "祖国, 智慧, 探索"] },
+    { name: "Y6", en: "Year 6", da: "5. klasse", sample: ["necessary, rhythm, conscience", "rytme, succes, champignon", "一心一意, 奋斗, 灿烂"] },
   ];
   // Each level's label and words in the user's language (applyLang).
   function setBuckets() {
@@ -562,7 +581,7 @@
   // Up-and-down reaches from a home key and back: "frf", "jmj".
   // The Danish home row ends in æ (and ø), with å above it.
   const REACHES = ["fr", "fv", "ft", "fg", "fb", "ju", "jm", "jy", "jh", "jn", "de", "dc", "ki", "k,", "sw", "sx", "lo", "l.", "aq", "az"];
-  const W = () => (DA() ? WARMUP_DA : WARMUP);
+  const W = () => (DA() ? WARMUP_DA : WARMUP); // Chinese uses the English drills (the English keyboard)
   const WARMUP_KINDS = [
     ["Home row: keep your fingers on the F and J bumps", "Grundrækken: hold fingrene på knopperne på F og J", () => randomLetters(tx("asdfghjkl", "asdfghjklæø"), 5, 3)],
     ["Home row words", "Ord på grundrækken", () => pickN(W().homeWords, 4).join(" ")],
@@ -577,7 +596,7 @@
     ["Punctuation", "Tegnsætning", () => pickN(W().phrases, 2).join(" ")],
     ["Every letter of the alphabet", "Alle alfabetets bogstaver", () => pick(W().pangrams)],
     ["Words from your level", "Ord fra dit niveau",
-      () => pickN(currentBucket().words.map((w) => w[0]).filter((w) => /^[a-zæøå]{3,7}$/.test(w)), 4).join(" ")],
+      () => pickN(currentBucket().words.map((w) => w[5] || w[0]).filter((w) => /^[a-zæøå]{3,7}$/.test(w)), 4).join(" ")],
   ];
 
   function buildItems(mode) {
@@ -592,7 +611,7 @@
         // wait, so the garden doesn't keep teaching the same words (user's request, 2026-11-01).
         const waiting = (w) => Date.parse(profile.learned[w.word]) >= Date.now() - 7 * 864e5;
         const fresh = pickRound(pool.filter((w) => !waiting(w)), n, masteredNow());
-        return [...fresh, ...freshPick(pool.filter(waiting), n - fresh.length, byWord)].map((w) => ({ ...w, target: w.word }));
+        return [...fresh, ...freshPick(pool.filter(waiting), n - fresh.length, byWord)].map((w) => ({ ...w, target: typeOf(w) }));
       }
       case "spell": {
         // Each batch (a "round" of 10): up to 3 words come back for another go, then Word Garden words, then
@@ -623,11 +642,11 @@
         const fresh = pickRound(left.filter((w) => !tricky.includes(w) && !learned.includes(w)), n - tricky.length - learned.length, masteredNow());
         const short = n - tricky.length - learned.length - fresh.length;
         const topUp = short > 0 ? freshPick(spare, short, byWord, (w) => profile.streak[w.word] || 0) : [];
-        return shuffle([...tricky, ...learned, ...fresh, ...topUp]).map((w) => ({ ...w, target: w.word, hidden: true }));
+        return shuffle([...tricky, ...learned, ...fresh, ...topUp]).map((w) => ({ ...w, target: typeOf(w), hidden: true }));
       }
       case "tricky": {
         const tricky = allWords().filter((w) => profile.tricky[w.word]);
-        return shuffle(tricky).slice(0, n).map((w) => ({ ...w, target: w.word, hidden: true }));
+        return shuffle(tricky).slice(0, n).map((w) => ({ ...w, target: typeOf(w), hidden: true }));
       }
       case "sentences":
         return freshPick(pool, n, (w) => "s:" + w.word).map((w) => ({ ...w, target: w.sentence }));
@@ -643,7 +662,7 @@
         const saved = practisedOn(profile, practiceDay);
         const left = words.filter((w) => (saved[w] || 0) < PRACTISE_REPS);
         const list = (left.length ? left : words).map((word) =>
-          ({ word, meaning: "", sentence: "", why: "", ...known.get(word), target: word, reps: left.length ? saved[word] || 0 : 0 }));
+          ({ word, meaning: "", sentence: "", why: "", ...known.get(word), target: known.has(word) ? typeOf(known.get(word)) : word, reps: left.length ? saved[word] || 0 : 0 }));
         return profile.practiseOrder === "random" ? shuffle(list) : list; // Settings > Practice order
 
       }
@@ -761,6 +780,19 @@
     const means = tx("means", "betyder");
     if (m === "warm") {
       card.innerHTML = `<div class="tagline">${escapeHtml(it.tag)}</div>`;
+    } else if (it.type && (m === "spell" || m === "tricky")) {
+      // Chinese: the characters and their meaning; the pinyin is what is typed, so it isn't shown.
+      card.innerHTML = `<div class="hanzi" lang="zh-CN">${escapeHtml(it.word)}</div>
+        <div class="meaning">${tx("It means", "Det betyder")} ${escapeHtml(it.meaning)}</div>
+        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear the word", "Hør ordet")}</button></div>`;
+    } else if (it.type) {
+      // Chinese, shown (Word Garden, Practice): the characters, their pinyin with tones and the meaning.
+      card.innerHTML = (m === "practise" ? `<div class="tagline">${tx(`Type it ${PRACTISE_REPS} times with no mistakes`, `Skriv det ${PRACTISE_REPS} gange uden fejl`)}</div>
+        <div class="reps" role="img" aria-label="${repsSaid(it)}">${repsDots(it)}</div>` : "") +
+        `<div class="hanzi" lang="zh-CN">${escapeHtml(it.word)}</div>
+        <div class="pinyin">${escapeHtml(it.pinyin)}</div>
+        <div class="meaning">${tx("It means", "Det betyder")} ${escapeHtml(it.meaning)}</div>
+        <div class="tools"><button class="ghost" data-say="word">🔊 ${tx("Hear it", "Hør det")}</button></div>`;
     } else if (m === "words") {
       card.innerHTML = `<div class="meaning"><b>${escapeHtml(it.word)}</b> ${means} ${escapeHtml(it.meaning)}</div>
         ${tip(it)}
@@ -832,6 +864,7 @@
     if (!ch || game.wait) { finger.textContent = ""; return; }
     if (it.hidden && !game.revealed) {
       finger.textContent = game.mode === "fixit" ? tx("Type the fixed sentence from the start.", "Skriv den rettede sætning fra begyndelsen.")
+        : it.type ? "Type its pinyin, without tones (ü is v). Press 🔊 to hear it again."
         : tx("Spell it from memory. Press 🔊 to hear it again.", "Stav det udenad. Tryk på 🔊 for at høre det igen.");
       return;
     }
@@ -875,7 +908,9 @@
     const capitalOk = !game.typed && it.word && it.sentence && ch !== want && ch === want.toUpperCase() &&
       findWord(it.sentence, it.word) === it.sentence.search(/\p{L}/u);
 
-    if (ch === want || capitalOk) {
+    // Chinese pinyin: a capital counts (Caps Lock), and ü may be typed u as well as v (input methods use v).
+    const pinyinOk = ZH() && it.type && (ch.toLowerCase() === want || (want === "v" && ch.toLowerCase() === "u"));
+    if (ch === want || capitalOk || pinyinOk) {
       game.typed += want;
       game.correct++;
       game.posErr = 0;
@@ -1262,7 +1297,7 @@
   // The level and year buttons, and the other choices drawn by the code, in the user's language (applyLang).
   function renderChoices() {
     $("#levels").innerHTML = BUCKETS.map((b) =>
-      `<button class="level" data-bucket="${b.name}" role="radio"><b>${b.label}</b><span>${b.words.length} ${tx("words, like", "ord, f.eks.")} ${tx(...b.sample)}</span></button>`).join("");
+      `<button class="level" data-bucket="${b.name}" role="radio"><b>${b.label}</b><span>${b.words.length} ${tx("words, like", "ord, f.eks.")} ${ZH() ? b.sample[2] : tx(b.sample[0], b.sample[1])}</span></button>`).join("");
     for (const id of ["#segYear", "#newYear"])
       $(id).innerHTML = BUCKETS.map((b) => `<button type="button" role="radio" aria-checked="false" data-year="${b.name}">${b.label}</button>`).join("");
     // One button per entry in LENGTHS, so the test build's extra 5-minute choice needs no change to index.html.
@@ -1399,7 +1434,7 @@
     showSync();
     showShare();
     showLang(null);
-    for (const b of $("#segLang").children) b.setAttribute("aria-checked", String(b.dataset.lang === (DA() ? "da" : "en")));
+    for (const b of $("#segLang").children) b.setAttribute("aria-checked", String(b.dataset.lang === wordLang()));
     for (const b of $("#segOrder").children) b.setAttribute("aria-checked", String(b.dataset.order === (profile.practiseOrder === "random" ? "random" : "order")));
     for (const b of $("#segUpd").children) b.setAttribute("aria-checked", String((b.dataset.upd === "on") === autoUpd()));
     // No one chosen: no one's year, sound or order is shown as picked.
@@ -1911,7 +1946,7 @@
     if (!newYear) return $("#newYear button").focus();
     const id = newId();
     // A new user starts in the language on screen (the last user's).
-    const lang = DA() ? "da" : "en";
+    const lang = wordLang();
     store.users[id] = { ...DEFAULTS(), name, year: newYear, bucket: newYear, lang, voice: DEFAULT_VOICE[lang], id, created: new Date().toISOString() };
     if (pendingGoogle) Object.assign(store.users[id], { google: googleOf(pendingGoogle), updated: new Date().toISOString() });
     useProfile(id);
@@ -2487,7 +2522,7 @@
   // screen, when there is any history to lose.
   const hasHistory = () => profile.rounds || profile.sessions.length || Object.keys(profile.tricky).length ||
     Object.keys(profile.learned).length || Object.keys(profile.practised).length || Object.keys(profile.seen).length;
-  const LANG_NAME = { en: "English", da: "Dansk" };
+  const LANG_NAME = { en: "English", da: "Dansk", zh: "中文 (Chinese)" };
   // Danish possessive: "Lukes", but "Klaus'".
   const owner = (n) => (/[sxz]$/i.test(n) ? n + "'" : n + "s");
   function showLang(lang) {
@@ -2528,7 +2563,7 @@
   }
   $("#segLang").addEventListener("click", (e) => {
     const b = e.target.closest("button");
-    if (!b || b.dataset.lang === (DA() ? "da" : "en")) return showLang(null);
+    if (!b || b.dataset.lang === wordLang()) return showLang(null);
     if (!chosen) return setScreenLang(b.dataset.lang);
     if (hasHistory()) showLang(b.dataset.lang);
     else switchLang(b.dataset.lang);
@@ -2555,7 +2590,7 @@
   }
   // Everything that follows the user's language: run at start and whenever the user or language changes.
   function applyLang() {
-    document.documentElement.lang = tx("en-GB", "da");
+    document.documentElement.lang = tx("en-GB", "da"); // Chinese words carry lang="zh-CN" themselves
     translatePage();
     setLayout();
     buildKeyboard();

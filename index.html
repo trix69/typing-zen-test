@@ -49,7 +49,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 </script>
 <!-- /pwa -->
-<link rel="stylesheet" href="style.css?v=37f0c72b68">
+<link rel="stylesheet" href="style.css?v=d901c084cb">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -226,6 +226,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <div class="segc" role="radiogroup" aria-labelledby="lblLang" id="segLang">
       <button type="button" role="radio" aria-checked="false" data-lang="en" lang="en">English</button>
       <button type="button" role="radio" aria-checked="false" data-lang="da" lang="da">Dansk</button>
+      <button type="button" role="radio" aria-checked="false" data-lang="zh" lang="zh-CN">中文</button>
     </div>
     <p class="note" id="langNote" hidden></p>
     <div class="clear-confirm" id="langConfirm" role="alert" hidden>
@@ -305,7 +306,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       <button type="button" role="radio" aria-checked="true" data-upd="on">On</button>
       <button type="button" role="radio" aria-checked="false" data-upd="off">Off</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="37f0c72b68">1.18-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="d901c084cb">1.18-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -398,9 +399,10 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <button type="button" class="sheet-done" id="boardDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=37f0c72b68"></script>
-<script src="words-da.js?v=37f0c72b68"></script>
-<script src="data.js?v=37f0c72b68"></script>
-<script src="app.js?v=37f0c72b68"></script>
+<script src="words.js?v=d901c084cb"></script>
+<script src="words-da.js?v=d901c084cb"></script>
+<script src="words-zh.js?v=d901c084cb"></script>
+<script src="data.js?v=d901c084cb"></script>
+<script src="app.js?v=d901c084cb"></script>
 </body>
 </html>
