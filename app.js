@@ -2324,7 +2324,8 @@
       }
     }
     for (const k of SYNC_SHARED) if (k in rp && later(k, newer)) p[k] = rp[k];
-    // (The language's time is kept back while a round holds the switch, so the next sync still makes it.)
+    // While a round holds the switch, the language's time is not taken here, and syncNow skips the profile write
+    // for that sync, so the cloud keeps the other device's choice and the first sync after the round makes it (R84.1).
     for (const [k, t] of Object.entries(theirStamps)) if (t > (p.setAt[k] || "") && !(k === "lang" && langWaits && playing)) p.setAt[k] = t;
     if (newer) p.updated = r.updated;
     const held = langWaits && playing; // the switch waits for this round to end (see syncNow)
