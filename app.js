@@ -980,6 +980,7 @@
   const wpm = (chars, ms) => (ms < 1500 ? 0 : Math.round(chars / 5 / (ms / 60000)));
   const accuracy = () => { const t = game.correct + game.errors; return t ? Math.round((game.correct / t) * 100) : 100; };
 
+  const CASELESS = new Set(["X-ray"]);
   function press(raw) {
     const it = game.items[game.idx];
     const ch = raw === "’" || raw === "‘" ? "'" : raw;
@@ -994,7 +995,9 @@
 
     // Chinese pinyin: a capital counts (Caps Lock), and ü may be typed u as well as v (input methods use v).
     const pinyinOk = ZH() && it.type && (ch.toLowerCase() === want || (want === "v" && ch.toLowerCase() === "u"));
-    if (ch === want || capitalOk || pinyinOk) {
+    // Words whose capitals are a matter of style, not spelling: in the Spelling Bee and Practice any case counts (user's request, 2026-11-06).
+    const caseOk = (game.mode === "spell" || game.mode === "practise") && CASELESS.has(it.word) && ch.toLowerCase() === want.toLowerCase();
+    if (ch === want || capitalOk || pinyinOk || caseOk) {
       game.typed += want;
       game.correct++;
       game.posErr = 0;
