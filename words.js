@@ -5005,9 +5005,9 @@ const WORD_GROUPS = [
 "variable \"ea\" sound"
 ],
 [
-"airplane",
-"an aeroplane",
-"The airplane flew over the sea.",
+"aeroplane",
+"a machine with wings that flies",
+"The aeroplane flew over the sea.",
 "simple, phonetic"
 ],
 [
@@ -6553,9 +6553,9 @@ const WORD_GROUPS = [
 "double letter (s)"
 ],
 [
-"colorful",
-"full of colour (American spelling of colourful)",
-"The parrot is very colorful.",
+"colourful",
+"full of bright colours",
+"The parrot is very colourful.",
 "3 syllables"
 ],
 [
@@ -7783,12 +7783,6 @@ const WORD_GROUPS = [
 "3 syllables"
 ],
 [
-"organize",
-"to arrange or plan (American spelling)",
-"We need to organize the books.",
-"3 syllables"
-],
-[
 "original",
 "the first one, or new and unusual",
 "This is the original painting.",
@@ -8039,12 +8033,6 @@ const WORD_GROUPS = [
 "not normal",
 "The weather is abnormal for June.",
 "3 syllables; unstressed schwa prefix \"a-\""
-],
-[
-"behavior",
-"the way you act (American spelling of behaviour)",
-"The dog's behavior has improved.",
-"3 syllables; unstressed schwa prefix \"be-\""
 ],
 [
 "brutally",
@@ -9511,9 +9499,9 @@ const WORD_GROUPS = [
 "3 syllables; \"ph\" = f sound"
 ],
 [
-"honorably",
+"honourably",
 "in an honest and good way",
-"He behaved honorably.",
+"He behaved honourably.",
 "3 syllables; silent h"
 ],
 [
