@@ -1792,6 +1792,11 @@
   const masteredOf = (res) => new Set(Object.keys(res).filter((w) => isMastered(res[w])));
   const levelOf = (u) => BUCKETS.find((b) => b.name === u.bucket && unlocked(u.year || "Y1").includes(b.name)) || BUCKETS.find((b) => b.name === u.year) || BUCKETS[0];
 
+  // American spellings taken out of the English list (2026-11-04, 2026-11-06), with the list's UK spelling: a
+  // session saved before then names the old one, and Practice and the stats lists show the new one (Hermes R86.2).
+  // Mastery (resultsIn) is not mapped: old results don't count towards the new spelling.
+  const RENAMED = { center: "centre", colorful: "colourful", honorably: "honourably", airplane: "aeroplane", organize: "organise", behavior: "behaviour" };
+  const listSpelling = (w) => (Object.prototype.hasOwnProperty.call(RENAMED, w) ? RENAMED[w] : w);
   // The words that weren't right first try, per local day of the last 7 (newest day first), each word once.
   function missedByDay(u) {
     const from = new Date();
@@ -1802,7 +1807,7 @@
       const d = s && s.date ? new Date(s.date) : null;
       if (!d || isNaN(d) || d < from || !Array.isArray(s.struggledWords)) continue;
       const list = days[d.toDateString()] || (days[d.toDateString()] = []);
-      for (const w of s.struggledWords) if (typeof w === "string" && !list.includes(w)) list.push(w);
+      for (const raw of s.struggledWords) { const w = listSpelling(raw); if (typeof w === "string" && !list.includes(w)) list.push(w); }
     }
     return Object.fromEntries(Object.entries(days).filter(([, l]) => l.length)
       .sort(([a], [b]) => new Date(b) - new Date(a)));
@@ -1820,7 +1825,7 @@
       if (!d || isNaN(d) || d < from || !Array.isArray(s.firstTryWords)) continue;
       const again = missed[d.toDateString()] || [];
       const list = days[d.toDateString()] || (days[d.toDateString()] = []);
-      for (const w of s.firstTryWords) if (typeof w === "string" && !list.includes(w) && !again.includes(w)) list.push(w);
+      for (const raw of s.firstTryWords) { const w = listSpelling(raw); if (typeof w === "string" && !list.includes(w) && !again.includes(w)) list.push(w); }
     }
     for (const day of Object.keys(missed)) days[day] = days[day] || [];
     // A day with words tested but no word lists (rounds saved before the lists were kept) still has a section,
