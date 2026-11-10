@@ -1767,7 +1767,7 @@
       t.words += (s.firstTry || 0) + (s.struggled || 0);
       // Of those not right first try, the ones practised all 5 times since (light green in the week chart).
       const reps = practisedOn(u, k);
-      if (Array.isArray(s.struggledWords)) t.practised += s.struggledWords.filter((w) => reps[w] >= PRACTISE_REPS).length;
+      if (Array.isArray(s.struggledWords)) t.practised += s.struggledWords.filter((w) => reps[listSpelling(w)] >= PRACTISE_REPS).length;
     }
     return days;
   }
@@ -1846,7 +1846,10 @@
   // Days older than 7 are dropped. Builds from before 2026-10-28 saved a list of finished words instead.
   function practisedOn(u, day) {
     const v = (u.practised || {})[day];
-    return Array.isArray(v) ? Object.fromEntries(v.map((w) => [w, PRACTISE_REPS])) : { ...v };
+    const o = Array.isArray(v) ? Object.fromEntries(v.map((w) => [w, PRACTISE_REPS])) : { ...v };
+    // A count saved under a spelling since taken out of the list moves to the list's spelling (Hermes R86.3).
+    for (const [w, n] of Object.entries(o)) { const k = listSpelling(w); if (k !== w) { o[k] = Math.max(o[k] || 0, n); delete o[w]; } }
+    return o;
   }
   // A word's count only goes up: a slip in Practice isn't counted but takes nothing away (R63).
   function savePractice(day, word, reps) {
