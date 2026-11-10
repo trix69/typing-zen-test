@@ -980,7 +980,7 @@
   const wpm = (chars, ms) => (ms < 1500 ? 0 : Math.round(chars / 5 / (ms / 60000)));
   const accuracy = () => { const t = game.correct + game.errors; return t ? Math.round((game.correct / t) * 100) : 100; };
 
-  const CASELESS = new Set(["X-ray"]);
+  const CASELESS = new Set(["X-ray", "Xbox"]); // Xbox: user's answer 2026-11-11 (Hermes R86.1)
   function press(raw) {
     const it = game.items[game.idx];
     const ch = raw === "’" || raw === "‘" ? "'" : raw;
