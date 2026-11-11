@@ -6157,9 +6157,9 @@ const WORD_GROUPS = [
 "simple, phonetic"
 ],
 [
-"program",
-"instructions for a computer",
-"We wrote a program to move the robot.",
+"programme",
+"a show on TV or radio, or a plan of events",
+"My favourite programme is on after tea.",
 "simple, phonetic"
 ],
 [

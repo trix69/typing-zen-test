@@ -1792,10 +1792,10 @@
   const masteredOf = (res) => new Set(Object.keys(res).filter((w) => isMastered(res[w])));
   const levelOf = (u) => BUCKETS.find((b) => b.name === u.bucket && unlocked(u.year || "Y1").includes(b.name)) || BUCKETS.find((b) => b.name === u.year) || BUCKETS[0];
 
-  // American spellings taken out of the English list (2026-11-04, 2026-11-06), with the list's UK spelling: a
+  // American spellings taken out of the English list (2026-11-04, 2026-11-06, 2026-11-11), with the list's UK spelling: a
   // session saved before then names the old one, and Practice and the stats lists show the new one (Hermes R86.2).
   // Mastery (resultsIn) is not mapped: old results don't count towards the new spelling.
-  const RENAMED = { center: "centre", colorful: "colourful", honorably: "honourably", airplane: "aeroplane", organize: "organise", behavior: "behaviour" };
+  const RENAMED = { center: "centre", colorful: "colourful", honorably: "honourably", airplane: "aeroplane", organize: "organise", behavior: "behaviour", program: "programme" };
   const listSpelling = (w) => (Object.prototype.hasOwnProperty.call(RENAMED, w) ? RENAMED[w] : w);
   // The words that weren't right first try, per local day of the last 7 (newest day first), each word once.
   function missedByDay(u) {
