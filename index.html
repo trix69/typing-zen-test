@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en-GB">
+<html lang="en-GB" data-pp="2026-11-12">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -49,7 +49,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 </script>
 <!-- /pwa -->
-<link rel="stylesheet" href="style.css?v=3e1345f0b4">
+<link rel="stylesheet" href="style.css?v=9e7f7e0b68">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -264,6 +264,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       <button type="button" class="ghost small" id="switchUserBtn">Switch user</button>
       <button type="button" class="ghost small" id="clearBtn">Clear history</button>
       <button type="button" class="ghost small" id="logoutBtn" hidden>Log out</button>
+      <button type="button" class="ghost small" id="eraseBtn" hidden>Delete my data from Google</button>
     </div>
     <div class="sync-row" id="syncRow" hidden>
       <p class="note" id="syncNote"></p>
@@ -274,6 +275,13 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       <div class="user-row">
         <button type="button" class="danger small" id="logoutYes">Log out</button>
         <button type="button" class="ghost small" id="logoutNo">Cancel</button>
+      </div>
+    </div>
+    <div class="clear-confirm" id="eraseConfirm" role="alert" hidden>
+      <p id="eraseAsk"></p>
+      <div class="user-row">
+        <button type="button" class="danger small" id="eraseYes"></button>
+        <button type="button" class="ghost small" id="eraseNo">Cancel</button>
       </div>
     </div>
     <div class="clear-confirm" id="clearConfirm" role="alert" hidden>
@@ -294,12 +302,17 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       <a class="howto-btn support-btn" id="coffeeLink" href="https://buymeacoffee.com/trinks" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">☕</span><span>Buy me a coffee</span></a>
       <img class="support-qr" src="icons/bmc-qr.png" alt="QR code for buymeacoffee.com/trinks" title="QR code for buymeacoffee.com/trinks" width="128" height="128">
     </div>
+    <h3 id="lblPp">Privacy policy</h3>
+    <div class="pp-row">
+      <p class="note" id="ppState"></p>
+      <button type="button" class="ghost small" id="ppOpen">Show the privacy policy</button>
+    </div>
     <h3 id="lblUpd">Automatic update check</h3>
     <div class="segc" role="radiogroup" aria-labelledby="lblUpd" id="segUpd">
       <button type="button" role="radio" aria-checked="true" data-upd="on">On</button>
       <button type="button" role="radio" aria-checked="false" data-upd="off">Off</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="3e1345f0b4">1.20-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="9e7f7e0b68">1.21-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -392,10 +405,24 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <button type="button" class="sheet-done" id="boardDone">Done</button>
   </div>
 </div>
-<script src="words.js?v=3e1345f0b4"></script>
-<script src="words-da.js?v=3e1345f0b4"></script>
-<script src="words-zh.js?v=3e1345f0b4"></script>
-<script src="data.js?v=3e1345f0b4"></script>
-<script src="app.js?v=3e1345f0b4"></script>
+<!-- PRIVACY POLICY: must be accepted before the app runs; the date is <html data-pp> (tools/version.py pp) -->
+<div class="sheet pp-sheet" id="ppSheet" role="dialog" aria-modal="true" aria-labelledby="ppTitle" aria-describedby="ppText" hidden>
+  <div class="sheet-card" id="ppCard" tabindex="-1">
+    <h2 id="ppTitle">Privacy policy</h2>
+    <p class="note pp-date" id="ppDate"></p>
+    <p id="ppText">Typing Zen signs you in with Google so your progress can follow you between devices, and keeps everything else on this device. This page explains what is stored, where, and how to delete it.</p>
+    <p><a id="ppLink" href="docs/privacy.html" target="_blank" rel="noopener">Read the full policy</a></p>
+    <p class="pp-need" id="ppNeed" role="alert" hidden>The app needs your agreement to the privacy policy to run.</p>
+    <div class="share-actions">
+      <button type="button" class="primary" id="ppAccept">Accept</button>
+      <button type="button" class="ghost" id="ppDecline">Decline</button>
+    </div>
+  </div>
+</div>
+<script src="words.js?v=9e7f7e0b68"></script>
+<script src="words-da.js?v=9e7f7e0b68"></script>
+<script src="words-zh.js?v=9e7f7e0b68"></script>
+<script src="data.js?v=9e7f7e0b68"></script>
+<script src="app.js?v=9e7f7e0b68"></script>
 </body>
 </html>

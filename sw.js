@@ -1,17 +1,17 @@
 /* Typing Zen service worker, written by tools/make_sw.py: do not edit by hand.
    It keeps an offline copy of every file the app uses. VERSION changes whenever any of them does. */
-const VERSION = "typing-zen-test-ca36b06f3e";
+const VERSION = "typing-zen-test-eb19b5910a";
 /* Only this site's caches: the live and test sites share trix69.github.io, so never touch the other's. */
 const MINE = (k) => /^typing\-zen\-test\-[0-9a-f]{10}$/.test(k);
 const FILES = [
   "./",
   "index.html",
-  "style.css?v=3e1345f0b4",
-  "words.js?v=3e1345f0b4",
-  "words-da.js?v=3e1345f0b4",
-  "words-zh.js?v=3e1345f0b4",
-  "data.js?v=3e1345f0b4",
-  "app.js?v=3e1345f0b4",
+  "style.css?v=9e7f7e0b68",
+  "words.js?v=9e7f7e0b68",
+  "words-da.js?v=9e7f7e0b68",
+  "words-zh.js?v=9e7f7e0b68",
+  "data.js?v=9e7f7e0b68",
+  "app.js?v=9e7f7e0b68",
   "manifest.webmanifest",
   "fonts/atkinson-hyperlegible-latin-400-normal.woff2",
   "fonts/atkinson-hyperlegible-latin-700-normal.woff2",
@@ -80,11 +80,14 @@ const FILES = [
   "sounds/yellow/release/SPACE.mp3"
 ];
 self.addEventListener("install", (e) => {
-  /* Everything at once, so a half-saved copy is never used; the old copy stays until this one is complete. */
+  /* Everything at once, so a half-saved copy is never used; the old copy stays until this one is complete.
+     A new copy then waits: it takes over only when the page asks (Update in the app, user's request 2026-11-12:
+     Later keeps this build), or by itself once every page of the app is closed. The first copy has nothing to
+     wait for. */
   e.waitUntil(caches.open(VERSION)
-    .then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" }))))
-    .then(() => self.skipWaiting()));
+    .then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))));
 });
+self.addEventListener("message", (e) => { if (e.data === "skipWaiting") self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys()
     .then((ks) => Promise.all(ks.filter((k) => k !== VERSION && MINE(k)).map((k) => caches.delete(k))))
@@ -93,7 +96,12 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET" || req.cache === "no-store") return; /* Settings > Check for updates asks the network */
-  if (new URL(req.url).origin !== location.origin) return;
+  const url = new URL(req.url);
+  if (url.origin !== location.origin) return;
+  /* Only the app itself opens from the saved copy: any other page (docs/privacy.html) goes to the network, or it
+     would open the app instead (the Violin Toolkit rule). */
+  const scope = new URL(self.registration.scope).pathname;
+  if (req.mode === "navigate" && url.pathname !== scope && url.pathname !== scope + "index.html") return;
   e.respondWith((async () => {
     const c = await caches.open(VERSION);
     /* Pages open from the saved copy (any ?v= in the address is ignored); files come from it too. */

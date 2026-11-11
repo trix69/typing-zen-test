@@ -1518,7 +1518,9 @@
     for (const b of $("#segSound").children) b.setAttribute("aria-checked", String(b.dataset.sound === (currentSwitch() || "off")));
     showClear(0);
     showLogout(0);
+    showErase(0);
     showSync();
+    showPpState();
     showShare();
     for (const b of $("#segLang").children) b.setAttribute("aria-checked", String(b.dataset.lang === wordLang()));
     for (const b of $("#segOrder").children) b.setAttribute("aria-checked", String(b.dataset.order === (profile.practiseOrder === "random" ? "random" : "order")));
@@ -1554,13 +1556,21 @@
   // (sw.js), it fetches the new copy into the device and reloads; without one, it opens the new version with ?v=
   // in the address, so the browser fetches fresh files instead of reusing old ones.
   const CACHE_PREFIX = "typing-zen-test-"; // this site's offline copies (the test build uses typing-zen-test-)
-  // Asks for the new sw.js; it saves the new copy and takes over (skipWaiting + claim). Resolves true once it
-  // has, false if there was nothing new or it took over 60 s.
+  // Asks for the new sw.js and lets the new copy take over: a copy saved earlier waits (sw.js no longer takes
+  // over by itself, so Later keeps this build; user's request, 2026-11-12) and is told to go ahead; a copy still
+  // saving is told once it is saved. Resolves true once it has taken over, false if there was nothing new or it
+  // took over 60 s.
   const newCopy = (reg) => new Promise((done) => {
     const sw = navigator.serviceWorker, t = setTimeout(() => done(false), 60000);
     sw.addEventListener("controllerchange", () => { clearTimeout(t); done(true); }, { once: true });
-    reg.update().then(() => { if (!reg.installing && !reg.waiting) { clearTimeout(t); done(false); } },
-      () => { clearTimeout(t); done(false); });
+    const go = () => {
+      if (reg.waiting) return reg.waiting.postMessage("skipWaiting");
+      const w = reg.installing;
+      if (!w) { clearTimeout(t); return done(false); }
+      w.addEventListener("statechange", () => { if (w.state === "installed") w.postMessage("skipWaiting"); else if (w.state === "redundant") { clearTimeout(t); done(false); } });
+    };
+    if (reg.waiting) go();
+    else reg.update().then(go, () => { clearTimeout(t); done(false); });
   });
   // The release on the site when it is newer than this page, else null; throws when the site can't be reached
   // (offline, or the single-file copy). A different build stamp counts as newer (test builds keep the number).
@@ -1589,8 +1599,9 @@
     try {
       const live = await newerVersion();
       if (!live) { msg.textContent = tx("Up to date", "Du har den nyeste version"); return; }
-      msg.textContent = `${tx("Updating to", "Opdaterer til")} ${live.version}…`;
-      await updateTo(live);
+      // It asks, like the automatic check (user's request, 2026-11-12): Update installs, Later keeps this build.
+      msg.textContent = tx(`${live.version} is ready`, `${live.version} er klar`);
+      askUpdate(live, true);
     } catch {
       msg.textContent = navigator.onLine === false ? tx("Can't check while offline", "Kan ikke søge uden internet") : tx("Can't check here", "Kan ikke søge her");
     }
@@ -1606,20 +1617,24 @@
   let updPending = null, updOffered = "", updLast = 0, updOpener = null;
   async function autoCheck() {
     if (!autoUpd() || document.hidden || Date.now() - updLast < 6 * 3600e3) return;
+    if (navigator.onLine === false) return; // offline: no request at all; tried again on the next return
     updLast = Date.now();
     try {
       const live = await newerVersion();
       if (live && (live.build || live.version) !== updOffered) askUpdate(live);
     } catch { updLast = 0; }
   }
-  function askUpdate(live) {
-    if (!autoUpd()) return;
+  // force: asked from Settings > Check for updates, so it asks even with the automatic check off, and the open
+  // Settings sheet doesn't count as busy (the question opens over it).
+  function askUpdate(live, force = false) {
+    if (!autoUpd() && !force) return;
+    if (!force && updOffered === (live.build || live.version)) return; // once per build per visit (a manual check asks again)
     // A half-filled first-visit form counts as busy too, focused or not, so the question never takes the caret or
     // Enter from it (Hermes R76.1, R76.3, R76.4); it asks on home once the user has joined.
     const typing = document.activeElement === $("#newName") // Hermes R76.4: the caret in the box, even empty
       || (!$("#welcome").hidden && !$("#intro-new").hidden && !!$("#newName").value.trim());
-    const busy = document.hidden || typing || ($("#welcome").hidden && $("#home").hidden) || [...document.querySelectorAll(".sheet")].some((el) => !el.hidden);
-    if (busy) { setTimeout(() => askUpdate(live), 5000); return; }
+    const busy = document.hidden || typing || ($("#welcome").hidden && $("#home").hidden) || [...document.querySelectorAll(".sheet")].some((el) => !el.hidden && !(force && el === sheet));
+    if (busy) { setTimeout(() => askUpdate(live, force), 5000); return; }
     updPending = live; updOffered = live.build || live.version;
     $("#updMsg").textContent = tx(`Version ${live.version} is ready. Update now?`, `Version ${live.version} er klar. Vil du opdatere nu?`);
     updOpener = document.activeElement;
@@ -1777,14 +1792,18 @@
   // a miss takes it away until it has 3 in a row again.
   const MASTER_RUN = 2; // test build only (live: 3)
   // { word: [right first try?, …] } in one level, oldest first, from the sessions that ended before `until` (ms).
+  // A spelling since taken out of the list (RENAMED) is skipped: it is in no level, so it can't add to the
+  // mastered figures (Hermes R87.1). Old results still don't count for the new spelling. (Not "the level's own
+  // words only": a Spelling Bee also brings in tricky words from other years, and those count where played.)
   function resultsIn(u, level, until = Infinity) {
     const out = {};
+    const current = (w) => listSpelling(w) === w;
     const list = (u.sessions || []).filter((s) => s && s.game === "spell" && s.level === level && Date.parse(s.date) < until)
       .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
     for (const s of list) {
       // Within a session a word missed and then spelled right again later was missed first.
-      for (const w of Array.isArray(s.struggledWords) ? s.struggledWords : []) (out[w] = out[w] || []).push(false);
-      for (const w of Array.isArray(s.firstTryWords) ? s.firstTryWords : []) (out[w] = out[w] || []).push(true);
+      for (const w of Array.isArray(s.struggledWords) ? s.struggledWords : []) if (current(w)) (out[w] = out[w] || []).push(false);
+      for (const w of Array.isArray(s.firstTryWords) ? s.firstTryWords : []) if (current(w)) (out[w] = out[w] || []).push(true);
     }
     return out;
   }
@@ -2364,7 +2383,7 @@
   };
   function syncNow() {
     clearTimeout(syncTimer);
-    if (!chosen || !profile.google || !cloudOn()) return Promise.resolve();
+    if (!chosen || !profile.google || !cloudOn() || erasing === profile) return Promise.resolve(); // nothing goes up while it is being deleted
     if (syncing) { syncAgain = true; return syncing; }
     const p = profile, cs = p.cloud || (p.cloud = {});
     cs.state = "busy";
@@ -2426,6 +2445,7 @@
     $("#syncRow").hidden = !g;
     $("#logoutBtn").hidden = !chosen;
     $("#logoutBtn").textContent = profile.google ? tx("Log out", "Log ud") : tx("Remove account", "Fjern konto");
+    $("#eraseBtn").hidden = !g || !$("#eraseConfirm").hidden;
     if (!g) return;
     const cs = profile.cloud || {}, email = profile.google.email;
     const at = cs.at ? new Date(cs.at).toLocaleTimeString(locale(), { hour: "2-digit", minute: "2-digit" }) : "";
@@ -2686,6 +2706,81 @@
     showWelcome();
   });
 
+  // Delete my data from Google (user's request, 2026-11-12, for the privacy policy): everything Typing Zen keeps for
+  // this account on Google's servers goes: the progress record, every Spelling Bee round and the ranking entry.
+  // Then Google's sign-in record for Typing Zen is deleted too when Google allows it (it can ask for a recent
+  // sign-in first: then the user is told to e-mail), and the user leaves this device as with Log out.
+  // Asked twice, like Clear history. step: 0 closed, 1, 2, 3 = the outcome (OK takes the user off the device).
+  let erasing = null;
+  function showErase(step, outcome) {
+    $("#eraseConfirm").hidden = !step;
+    $("#eraseBtn").hidden = !!step || !(chosen && profile.google && cloudOn());
+    $("#eraseYes").dataset.step = step || 0;
+    $("#eraseNo").hidden = step === 3;
+    if (!step) return;
+    const n = profile.name;
+    $("#eraseAsk").textContent = step === 3 ? outcome : step === 2 ? tx("Are you sure? This can't be undone.", "Er du sikker? Det kan ikke fortrydes.")
+      : tx(`Delete everything Typing Zen keeps for ${n} on Google's servers: the progress, every Spelling Bee round and the ranking entry? ${n} is then logged out on this device. Log out on ${n}'s other devices first, or they save their copy again. This can't be undone.`,
+        `Slet alt, hvad Typing Zen gemmer for ${n} på Googles servere: fremskridt, alle Stavebi-runder og pladsen på ranglisten? ${n} logges derefter ud på denne enhed. Log først ud på ${owner(n)} andre enheder, ellers gemmer de deres kopi igen. Det kan ikke fortrydes.`);
+    $("#eraseYes").textContent = step === 3 ? "OK" : step === 2 ? tx(`Yes, delete ${owner(n)} data`, `Ja, slet ${owner(n)} data`) : tx("Yes, delete", "Ja, slet");
+    $("#eraseYes").focus();
+  }
+  async function eraseCloud(p) {
+    erasing = p;
+    if (syncing) await syncing.catch(() => {});
+    const c = await userCloud(p.google.uid), { fs, au } = c;
+    if (!c.auth.currentUser || c.auth.currentUser.uid !== p.google.uid) throw Object.assign(new Error("out"), { code: "out" });
+    const ref = fs.doc(c.db, CLOUD, p.google.uid);
+    const refs = (await fs.getDocs(fs.collection(ref, "sessions"))).docs.map((d) => d.ref);
+    refs.push(fs.doc(c.db, BOARD, p.google.uid), ref);
+    for (let i = 0; i < refs.length; i += 400) {
+      const b = fs.writeBatch(c.db);
+      for (const r of refs.slice(i, i + 400)) b.delete(r);
+      await b.commit();
+    }
+    try { await au.deleteUser(c.auth.currentUser); return true; } catch {
+      try { await au.signOut(c.auth); } catch { /* signed out anyway when the user leaves this device */ }
+      return false;
+    }
+  }
+  $("#eraseBtn").addEventListener("click", () => { showClear(0); showLogout(0); showErase(1); });
+  $("#eraseNo").addEventListener("click", () => { showErase(0); $("#eraseBtn").focus(); });
+  $("#eraseYes").addEventListener("click", async () => {
+    const step = $("#eraseYes").dataset.step, p = profile;
+    if (step === "1") return showErase(2);
+    if (step === "3") {
+      delete store.users[p.id];
+      chosen = false;
+      store.current = users()[0] ? users()[0].id : null;
+      profile = store.users[store.current] || DEFAULTS();
+      saveLocal();
+      sheet.hidden = true;
+      document.removeEventListener("keydown", onSheetKey);
+      erasing = null;
+      return showWelcome();
+    }
+    $("#eraseYes").disabled = true;
+    try {
+      const all = await eraseCloud(p);
+      showErase(3, all ? tx(`${p.name}'s data has been deleted from Google's servers, with the Google sign-in for Typing Zen.`, `${owner(p.name)} data er slettet fra Googles servere, med Google-login til Typing Zen.`)
+        : tx(`${p.name}'s progress has been deleted from Google's servers. Google's sign-in record for Typing Zen couldn't be removed from here: e-mail trinks.wang@gmail.com and it will be.`,
+          `${owner(p.name)} fremskridt er slettet fra Googles servere. Googles login-post for Typing Zen kunne ikke fjernes herfra: skriv til trinks.wang@gmail.com, så bliver den slettet.`));
+    } catch (e) {
+      erasing = null;
+      showErase(0);
+      $("#syncNote").textContent = !navigator.onLine ? tx("You're offline. Deleting your data from Google needs the internet.", "Du er offline. Det kræver internet at slette dine data hos Google.")
+        : e && e.code === "out" ? tx(`Sign in with Google as ${p.google.email} again first.`, `Log ind med Google som ${p.google.email} igen først.`)
+        : tx("Couldn't delete just now. Nothing was changed on this device; please try again.", "Kunne ikke slette lige nu. Intet blev ændret på denne enhed; prøv igen.");
+    } finally { $("#eraseYes").disabled = false; }
+  });
+
+  // The privacy policy row in Settings: the date accepted on this device, and a button that shows the policy.
+  function showPpState() {
+    let saved = "";
+    try { saved = localStorage.getItem(PP_KEY) || ""; } catch { /* storage unavailable */ }
+    $("#ppState").textContent = saved ? tx(`Accepted on this device: ${saved}`, `Accepteret på denne enhed: ${saved}`) : tx("Not accepted", "Ikke accepteret");
+  }
+
   // ---------- Language setting ----------
   // Settings > Language: a user's language switches at once and keeps each language's history apart (user's request,
   // 2026-11-04; until then switching cleared it after a warning). With no one chosen, only the start screens change.
@@ -2759,9 +2854,69 @@
     kbdLabel();
   }
 
+  // ---------- Privacy policy (user's request, 2026-11-12) ----------
+  // The policy must be accepted before the app is used. Its date is its version: index.html carries it as
+  // <html data-pp> (tools/version.py pp stamps it there, in docs/privacy.html and in docs/privacy-version.json),
+  // so the check needs no network at all, offline included. Accepting saves the date in typingZen.pp; a later
+  // date asks again ("Privacy policy updated"). Declining saves nothing and leaves Accept there: no way round it.
+  // The screen covers the page (the rest is inert), with no Escape and no tap outside.
+  // #pp=reset in the address ignores the saved acceptance for this visit (for testing; no visible control).
+  const PP = document.documentElement.dataset.pp || "";
+  const PP_KEY = "typingZen.pp-test";
+  const ppSaved = () => { try { return localStorage.getItem(PP_KEY) || ""; } catch { return ""; } };
+  let ppIgnoreSaved = false;
+  if (location.hash === "#pp=reset") { ppIgnoreSaved = true; history.replaceState(null, "", location.pathname + location.search); }
+  const ppAccepted = () => !!PP && !ppIgnoreSaved && ppSaved() === PP;
+  const ppSheet = $("#ppSheet");
+  let ppInert = [], ppOpener = null;
+  function showPolicy() {
+    if (!ppSheet.hidden) return;
+    const before = ppSaved();
+    $("#ppTitle").textContent = before && before !== PP && !ppIgnoreSaved ? tx("Privacy policy updated", "Privatlivspolitik opdateret") : tx("Privacy policy", "Privatlivspolitik");
+    $("#ppDate").textContent = tx(`Last updated ${PP}`, `Sidst opdateret ${PP}`);
+    $("#ppNeed").hidden = true;
+    ppOpener = document.activeElement;
+    // Everything else on the page is inert while the policy is open: no focus, no clicks, no typing behind it.
+    ppInert = [...document.body.children].filter((el) => el !== ppSheet && !el.inert);
+    for (const el of ppInert) el.inert = true;
+    ppSheet.hidden = false;
+    window.addEventListener("keydown", onPpKey, true);
+    $("#ppAccept").focus();
+  }
+  function closePolicy() {
+    ppSheet.hidden = true;
+    for (const el of ppInert) el.inert = false;
+    ppInert = [];
+    window.removeEventListener("keydown", onPpKey, true);
+    try { if (ppOpener && ppOpener !== document.body) ppOpener.focus(); } catch { /* it has gone */ }
+  }
+  // Escape does nothing; Tab stays inside; no key reaches the page behind.
+  function onPpKey(e) {
+    if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (e.key === "Tab") {
+      const f = [...ppSheet.querySelectorAll("a[href], button")].filter((el) => !el.hidden && el.offsetParent);
+      const i = f.indexOf(document.activeElement);
+      e.preventDefault();
+      f[(i + (e.shiftKey ? f.length - 1 : 1) + f.length) % f.length].focus();
+      e.stopImmediatePropagation();
+      return;
+    }
+    if (!ppSheet.contains(e.target)) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }
+  $("#ppAccept").addEventListener("click", () => {
+    try { localStorage.setItem(PP_KEY, PP); } catch { /* storage unavailable: asked again next time */ }
+    ppIgnoreSaved = false;
+    closePolicy();
+    if (!sheet.hidden) syncSheet();
+  });
+  $("#ppDecline").addEventListener("click", () => { $("#ppNeed").hidden = false; $("#ppAccept").focus(); });
+  $("#ppOpen").addEventListener("click", showPolicy);
+  // The single-file copy has no docs/ beside it (tools/bundle.py points the link at the live site instead).
+
   applyLang();
   showWelcome();
   const back = cloudOn() && cameBack();
+  if (!ppAccepted()) showPolicy();
   if (back && back.why === "sync") syncSignIn(back.user);
   else if (back) googleStart(users().length ? $("#googleSwitch") : $("#googleNew"), back.user);
 })();
