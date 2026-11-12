@@ -1536,6 +1536,8 @@
     $("#sheetCard").focus();
   }
   function closeSheet() {
+    // Delete my data from Google has finished: closing Settings any way finishes it as OK does (Hermes R88.1).
+    if (erasing && $("#eraseYes").dataset.step === "3") return leaveErased(erasing);
     sheet.hidden = true;
     document.removeEventListener("keydown", onSheetKey);
     $($("#welcome").hidden ? "#settingsBtn" : "#welcomeSettingsBtn").focus();
@@ -2779,7 +2781,21 @@
     $("#eraseYes").textContent = step === 3 ? "OK" : step === 2 ? tx(`Yes, delete ${owner(n)} data`, `Ja, slet ${owner(n)} data`) : tx("Yes, delete", "Ja, slet");
     $("#eraseYes").focus();
   }
-  async function eraseCloud(p) {
+  // The last step, after the outcome: the user leaves this device and syncing is no longer held. Run by OK, and by
+  // closing Settings any other way (Done, Esc, a click outside: Hermes R88.1).
+  function leaveErased(p) {
+    erasing = null;
+    showErase(0);
+    delete store.users[p.id];
+    chosen = false;
+    store.current = users()[0] ? users()[0].id : null;
+    profile = store.users[store.current] || DEFAULTS();
+    saveLocal();
+    sheet.hidden = true;
+    document.removeEventListener("keydown", onSheetKey);
+    showWelcome();
+  }
+    async function eraseCloud(p) {
     erasing = p;
     if (syncing) await syncing.catch(() => {});
     const c = await userCloud(p.google.uid), { fs, au } = c;
@@ -2802,20 +2818,12 @@
   $("#eraseYes").addEventListener("click", async () => {
     const step = $("#eraseYes").dataset.step, p = profile;
     if (step === "1") return showErase(2);
-    if (step === "3") {
-      delete store.users[p.id];
-      chosen = false;
-      store.current = users()[0] ? users()[0].id : null;
-      profile = store.users[store.current] || DEFAULTS();
-      saveLocal();
-      sheet.hidden = true;
-      document.removeEventListener("keydown", onSheetKey);
-      erasing = null;
-      return showWelcome();
-    }
+    if (step === "3") return leaveErased(p);
     $("#eraseYes").disabled = true;
     try {
       const all = await eraseCloud(p);
+      if (sheet.hidden) return leaveErased(p); // Settings was closed while it ran: finish now
+      $("#syncNote").textContent = tx("Deleted from Google: nothing is synced any more.", "Slettet hos Google: intet synkroniseres mere."); // not "Synced …" (R88.1)
       showErase(3, all ? tx(`${p.name}'s data has been deleted from Google's servers, with the Google sign-in for Typing Zen.`, `${owner(p.name)} data er slettet fra Googles servere, med Google-login til Typing Zen.`)
         : tx(`${p.name}'s progress has been deleted from Google's servers. Google's sign-in record for Typing Zen couldn't be removed from here: e-mail trinks.wang@gmail.com and it will be.`,
           `${owner(p.name)} fremskridt er slettet fra Googles servere. Googles login-post for Typing Zen kunne ikke fjernes herfra: skriv til trinks.wang@gmail.com, så bliver den slettet.`));
