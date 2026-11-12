@@ -49,7 +49,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 }
 </script>
 <!-- /pwa -->
-<link rel="stylesheet" href="style.css?v=9e7f7e0b68">
+<link rel="stylesheet" href="style.css?v=39461fed30">
 </head>
 <body>
 <div class="test-ribbon" aria-hidden="true">TEST</div>
@@ -312,7 +312,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       <button type="button" role="radio" aria-checked="true" data-upd="on">On</button>
       <button type="button" role="radio" aria-checked="false" data-upd="off">Off</button>
     </div>
-    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="9e7f7e0b68">1.21-test</span></span> · <span id="verMsg">Check for updates</span></button>
+    <button type="button" class="ver" id="verBtn"><span>Version <span id="appVersion" data-build="39461fed30">1.21-test</span></span> · <span id="verMsg">Check for updates</span></button>
     </div>
     <button type="button" class="sheet-done" id="sheetDone">Done</button>
   </div>
@@ -405,12 +405,24 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     <button type="button" class="sheet-done" id="boardDone">Done</button>
   </div>
 </div>
+<!-- SIGN IN WITH GOOGLE: what it means, asked every time before Google is opened (user's request, 2026-11-12) -->
+<div class="sheet" id="gSheet" role="dialog" aria-modal="true" aria-labelledby="gTitle" aria-describedby="gText" hidden>
+  <div class="sheet-card" id="gCard" tabindex="-1">
+    <h2 id="gTitle">Sign in with Google</h2>
+    <p id="gText">Signing in with Google lets your progress follow you to your other devices. Google tells Typing Zen your name, e-mail address and profile picture, and your progress and Spelling Bee rounds are saved with Google (Firebase, in Sydney, Australia). Your name and e-mail address are not saved there. You can delete it all in Settings: Delete my data from Google.</p>
+    <p><a id="gLink" href="docs/privacy.html" target="_blank" rel="noopener">Read the full policy</a></p>
+    <div class="share-actions">
+      <button type="button" class="primary" id="gContinue">Continue</button>
+      <button type="button" class="ghost" id="gCancel">Cancel</button>
+    </div>
+  </div>
+</div>
 <!-- PRIVACY POLICY: must be accepted before the app runs; the date is <html data-pp> (tools/version.py pp) -->
 <div class="sheet pp-sheet" id="ppSheet" role="dialog" aria-modal="true" aria-labelledby="ppTitle" aria-describedby="ppText" hidden>
   <div class="sheet-card" id="ppCard" tabindex="-1">
     <h2 id="ppTitle">Privacy policy</h2>
     <p class="note pp-date" id="ppDate"></p>
-    <p id="ppText">Typing Zen signs you in with Google so your progress can follow you between devices, and keeps everything else on this device. This page explains what is stored, where, and how to delete it.</p>
+    <p id="ppText">Typing Zen keeps your progress on this device. The full policy explains what is stored, where, and how to delete it.</p>
     <p><a id="ppLink" href="docs/privacy.html" target="_blank" rel="noopener">Read the full policy</a></p>
     <p class="pp-need" id="ppNeed" role="alert" hidden>The app needs your agreement to the privacy policy to run.</p>
     <div class="share-actions">
@@ -419,10 +431,10 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     </div>
   </div>
 </div>
-<script src="words.js?v=9e7f7e0b68"></script>
-<script src="words-da.js?v=9e7f7e0b68"></script>
-<script src="words-zh.js?v=9e7f7e0b68"></script>
-<script src="data.js?v=9e7f7e0b68"></script>
-<script src="app.js?v=9e7f7e0b68"></script>
+<script src="words.js?v=39461fed30"></script>
+<script src="words-da.js?v=39461fed30"></script>
+<script src="words-zh.js?v=39461fed30"></script>
+<script src="data.js?v=39461fed30"></script>
+<script src="app.js?v=39461fed30"></script>
 </body>
 </html>

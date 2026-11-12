@@ -2286,8 +2286,29 @@
       btn.disabled = false;
     }
   }
-  $("#googleNew").addEventListener("click", () => googleStart($("#googleNew")));
-  $("#googleSwitch").addEventListener("click", () => googleStart($("#googleSwitch")));
+  // Before Google is opened, every time: what signing in with Google means, Continue or Cancel (user's request,
+  // 2026-11-12: the first-launch policy screen doesn't mention Google; this does). Continue starts the sign-in in
+  // the same click, so the browser still allows Google's window. Escape, Cancel or a click outside closes it.
+  const gSheet = $("#gSheet");
+  let gThen = null, gOpener = null;
+  function askGoogle(then) {
+    gThen = then; gOpener = document.activeElement;
+    gSheet.hidden = false;
+    document.addEventListener("keydown", onGKey, true);
+    $("#gContinue").focus();
+  }
+  function onGKey(e) { trapFor(gSheet, closeGoogle)(e); }
+  function closeGoogle() {
+    gSheet.hidden = true;
+    gThen = null;
+    document.removeEventListener("keydown", onGKey, true);
+    try { gOpener.focus(); } catch { /* it has gone */ }
+  }
+  $("#gCancel").addEventListener("click", closeGoogle);
+  gSheet.addEventListener("click", (e) => { if (e.target === gSheet) closeGoogle(); });
+  $("#gContinue").addEventListener("click", () => { const then = gThen; closeGoogle(); if (then) then(); });
+  $("#googleNew").addEventListener("click", () => askGoogle(() => googleStart($("#googleNew"))));
+  $("#googleSwitch").addEventListener("click", () => askGoogle(() => googleStart($("#googleSwitch"))));
   $("#googleUndo").addEventListener("click", () => { setGoogle(null); $("#newName").focus(); });
 
   // Syncing. Nothing is lost when two devices were used apart: sessions are joined (by when they ended),
@@ -2473,7 +2494,7 @@
       if (m) $("#syncNote").textContent = m;
     }
   }
-  $("#syncSignIn").addEventListener("click", () => syncSignIn());
+  $("#syncSignIn").addEventListener("click", () => askGoogle(() => syncSignIn()));
   // ---------- Sharing: words tested this week, among everyone who shares ----------
   // User's requests, 2026-11-03. After a Spelling Bee a Google user who hasn't decided is asked "Would you like to
   // share and view your result?" (Yes / No / Don't remind me again); Settings has a Yes/No toggle; a user who
@@ -2536,7 +2557,7 @@
   const trapFor = (sheetEl, close) => (e) => {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); return close(); }
     if (e.key !== "Tab") return;
-    const items = [...sheetEl.querySelectorAll("button")].filter((b) => !b.hidden && !b.disabled);
+    const items = [...sheetEl.querySelectorAll("button, a[href]")].filter((b) => !b.hidden && !b.disabled && b.offsetParent);
     const first = items[0], last = items[items.length - 1];
     if (!sheetEl.contains(document.activeElement)) { e.preventDefault(); return first.focus(); }
     if (e.shiftKey && (document.activeElement === first || !items.includes(document.activeElement))) { e.preventDefault(); last.focus(); }
