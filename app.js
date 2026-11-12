@@ -2402,9 +2402,10 @@
     clearTimeout(syncTimer);
     syncTimer = setTimeout(syncNow, 4000);
   };
-  function syncNow() {
+  // card: the stats card (Welcome back, no one chosen yet) syncs the user it shows, for See where you rank.
+  function syncNow(card = false) {
     clearTimeout(syncTimer);
-    if (!chosen || !profile.google || !cloudOn() || erasing === profile) return Promise.resolve(); // nothing goes up while it is being deleted
+    if ((!chosen && !card) || !profile.google || !cloudOn() || erasing === profile) return Promise.resolve(); // nothing goes up while it is being deleted
     if (syncing) { syncAgain = true; return syncing; }
     const p = profile, cs = p.cloud || (p.cloud = {});
     cs.state = "busy";
@@ -2527,23 +2528,37 @@
     return days;
   }
   // Puts this user's week on the board (or takes it off). Quietly does nothing offline or signed out.
-  async function shareWrite(on, u = profile) {
+  async function shareWrite(on, u = profile, card = false) {
     if (!u.google || !cloudOn()) return false;
     // The entry is this user's words over every device, so it is written only after a sync has brought the other
     // devices' sessions here (user's report, 2026-11-04: 100+ words dropped to 35 after a round on another device).
-    // A user not chosen yet (the stats card) isn't synced: the board is read, the entry left as it is.
+    // From the stats card (no one chosen yet) the user it shows is synced first, then written (user's report,
+    // 2026-11-12: a sharer who only ever opened the board there was never on it for anyone else).
     if (on) {
-      if (u !== profile || !chosen) return false;
-      await syncNow();
-      if ((u.cloud || {}).state !== "ok") return false;
+      if (u !== profile || (!chosen && !card)) return false;
+      await syncNow(!chosen);
+      // A sync already running when this asked queues another, which starts as that one ends and shows "busy": wait
+      // for it too, or the entry is silently never written (user's report, 2026-11-12: Stella said Yes while the
+      // sync after her round was still going, saw herself on the board, and no one else ever saw her).
+      while (syncing) await syncing.catch(() => {});
+      // Written whatever the sync managed (user's request, 2026-11-12: See where you rank always sends this
+      // device's words up, whichever side is newer), but never lower than the entry already there: each day takes
+      // the higher of this device's count and the server's, so a device that missed the others' rounds can't pull
+      // the total down (the 2026-11-04 report). Offline there is nothing to send.
+      if (navigator.onLine === false) return false;
     }
     try {
       const c = await userCloud(u.google.uid);
       if (!c.auth.currentUser || c.auth.currentUser.uid !== u.google.uid) return false;
       const b = c.fs.writeBatch(c.db), ref = c.fs.doc(c.db, BOARD, u.google.uid);
-      if (on) b.set(ref, { name: maskName(u.name), days: myWeek(u), updated: new Date().toISOString() });
-      else b.delete(ref);
-      await b.commit();
+      if (on) {
+        const days = myWeek(u), week = new Set(weekKeys().map((k) => k.split("|")[0]));
+        const there = ((await c.fs.getDoc(ref)).data() || {}).days || {};
+        for (const [d, n] of Object.entries(there)) if (week.has(d) && Number(n) > (days[d] || 0)) days[d] = Number(n);
+        b.set(ref, { name: maskName(u.name), days, updated: new Date().toISOString() });
+      } else b.delete(ref);
+      // A commit with no connection waits for one: give up after 10 s rather than leave the board loading.
+      await Promise.race([b.commit(), new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000))]);
       return true;
     } catch { return false; }
   }
@@ -2559,6 +2574,7 @@
     if (e.key !== "Tab") return;
     const items = [...sheetEl.querySelectorAll("button, a[href]")].filter((b) => !b.hidden && !b.disabled && b.offsetParent);
     const first = items[0], last = items[items.length - 1];
+    if (!first) { e.preventDefault(); const card = sheetEl.querySelector(".sheet-card"); if (card) card.focus(); return; } // nothing to move to yet (the board's Done counting down): stay on the card
     if (!sheetEl.contains(document.activeElement)) { e.preventDefault(); return first.focus(); }
     if (e.shiftKey && (document.activeElement === first || !items.includes(document.activeElement))) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -2599,14 +2615,29 @@
   // of 4 and 5, and the users just above and below this one, with "…" for anyone skipped. Others' names are
   // masked; this user's own name is shown.
   // u: the user whose rank it shows (the stats card passes the user it shows, who may not be chosen yet).
+  // Done can't close the board for its first 2 s, counting down "Done (2)", "Done (1)" (user's request, 2026-11-12:
+  // the ranking takes a second or two to load, and it was often closed before it showed). Esc and a click outside
+  // wait too. If the board can't load, Done is free at once.
+  const BOARD_HOLD = 2;
+  let boardHold = 0, boardTick = 0;
+  function holdBoard(left) {
+    clearTimeout(boardTick);
+    boardHold = left;
+    const done = $("#boardDone");
+    done.disabled = left > 0;
+    done.textContent = left > 0 ? `${tx("Done", "Færdig")} (${left})` : tx("Done", "Færdig");
+    if (left > 0) boardTick = setTimeout(() => holdBoard(left - 1), 1000);
+    else if (!boardSheet.hidden) done.focus();
+  }
   async function openBoard(u = profile) {
     boardOpener = document.activeElement;
     boardSheet.hidden = false;
     document.addEventListener("keydown", onBoardKey, true);
-    $("#boardDone").focus();
+    $("#boardCard").focus();
+    holdBoard(BOARD_HOLD);
     const body = $("#boardBody");
-    body.innerHTML = `<p class="note">${tx("Loading…", "Henter …")}</p>`;
-    await shareWrite(true, u);
+    body.innerHTML = `<p class="note board-loading" role="status"><span class="spinner" aria-hidden="true"></span>${tx("Loading this week's ranking…", "Henter ugens rangliste …")}</p>`;
+    await shareWrite(true, u, true);
     let rows;
     try {
       const c = await userCloud(u.google.uid);
@@ -2619,6 +2650,7 @@
     } catch {
       body.innerHTML = `<p class="note">${navigator.onLine ? tx("Couldn't load the board just now. Please try again.", "Kunne ikke hente tavlen lige nu. Prøv igen.")
         : tx("You're offline. The board needs the internet.", "Du er offline. Tavlen kræver internet.")}</p>`;
+      holdBoard(0); // nothing to wait for
       return;
     }
     const me = u.google.uid;
@@ -2641,6 +2673,7 @@
       `<div class="podium">${spot(1, "p2", "🥈")}${spot(0, "p1", "🥇")}${spot(2, "p3", "🥉")}</div>` + (list ? `<ol class="board-list">${list}</ol>` : "");
   }
   function closeBoard() {
+    if (boardHold > 0) return; // still counting down
     boardSheet.hidden = true;
     document.removeEventListener("keydown", onBoardKey, true);
     const back = boardOpener && !boardOpener.hidden && boardOpener.isConnected ? boardOpener : ($("#boardBtn").hidden ? $("#againBtn") : $("#boardBtn"));

@@ -669,6 +669,11 @@ button.small { font-size: 0.85rem; padding: 4px 12px; border-radius: 10px; }
 .podium .p2 .stair { height: 64px; }
 .podium .p3 .stair { height: 44px; }
 .podium .me .who, .board-list .me { color: var(--accent); }
+/* The board while it loads (user's request, 2026-11-12): a small spinner beside the text; Done counts down. */
+.board-loading { display: flex; align-items: center; gap: 10px; margin: 18px 0; font-size: 15px; }
+.spinner { width: 18px; height: 18px; flex: none; border-radius: 50%; border: 2.5px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sheet-done:disabled { opacity: .6; cursor: default; }
 .board-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
 .board-list li { display: grid; grid-template-columns: 2.4em 1fr auto; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--line); font-size: 15px; }
 .board-list li .r { font: 600 13px var(--font-mono); color: var(--muted); }
