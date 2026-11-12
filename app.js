@@ -2555,7 +2555,10 @@
       const b = c.fs.writeBatch(c.db), ref = c.fs.doc(c.db, BOARD, u.google.uid);
       if (on) {
         const days = myWeek(u), week = new Set(weekKeys().map((k) => k.split("|")[0]));
-        const there = ((await c.fs.getDoc(ref)).data() || {}).days || {};
+        // Except after Clear history here: an entry older than the reset keeps nothing, so the cleared week leaves the
+        // board (Hermes R89.1); the write sets `updated` past `resetAt`, so later writes merge as usual.
+        const ent = (await c.fs.getDoc(ref)).data() || {};
+        const there = u.resetAt && u.resetAt > (ent.updated || "") ? {} : ent.days || {};
         for (const [d, n] of Object.entries(there)) if (week.has(d) && Number(n) > (days[d] || 0)) days[d] = Number(n);
         b.set(ref, { name: maskName(u.name), days, updated: new Date().toISOString() });
       } else b.delete(ref);
