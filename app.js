@@ -2950,7 +2950,7 @@
   }
     async function eraseCloud(p) {
     erasing = p;
-    if (syncing) await syncing.catch(() => {});
+    if (syncing) await within(syncing, 8000); // a stuck sync must not hold deletion, as Log out (Hermes R93.1)
     const c = await userCloud(p.google.uid), { fs, au } = c;
     if (!c.auth.currentUser || c.auth.currentUser.uid !== p.google.uid) throw Object.assign(new Error("out"), { code: "out" });
     const ref = fs.doc(c.db, CLOUD, p.google.uid);
