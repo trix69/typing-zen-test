@@ -1206,7 +1206,12 @@
   }
 
   function renderHome() {
-    if (game && !game.over) saveSession(false); // left a timed game early: keep what was done
+    if (game && !game.over) {
+      const bee = game.mode === "spell";
+      saveSession(false); // left a timed game early: keep what was done
+      // A Spelling Bee left early also ends: a milestone it reached is asked on Home (2026-11-13).
+      if (bee && profile.share !== true && shareDue()) profile.askNext = true;
+    }
     game = null;
     stopSpeech();
     $("#userName").textContent = profile.name;
