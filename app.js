@@ -1199,10 +1199,10 @@
 
   // ---------- Screens ----------
   function show(id) {
-    if (id !== "results") cancelAsk(); // the share question belongs to the results screen (Hermes R73.1)
+    if (id !== "results" && id !== "home") cancelAsk(); // the share question belongs to the results and Home (Hermes R73.1)
     if (id !== "play") $("#typer").blur(); // the device keyboard goes away with the game
     for (const s of document.querySelectorAll(".screen")) s.hidden = s.id !== id;
-    if (id === "home") renderHome();
+    if (id === "home") { renderHome(); if (chosen && profile.askNext) maybeAsk(); } // a milestone question missed on the results comes here
   }
 
   function renderHome() {
@@ -1490,7 +1490,14 @@
     if ($("#clearYes").dataset.step === "1") return showClear(2);
     // Keeps the name, level, mute, key sound and voice; wipes scores, tricky words and the session history.
     // resetAt: a Google user's other devices drop everything from before it too.
+    const wasSharing = profile.share === true;
     Object.assign(profile, FRESH(), { byLang: {}, resetAt: new Date().toISOString() }); // every language's history
+    // The board row goes too (Hermes R89.1), and sharing is undecided again, asked from the first milestone
+    // (null, not undefined, so the other devices of a Google user follow it).
+    if (wasSharing || profile.boardKey) boardDelete(profile);
+    profile.share = null;
+    profile.shareAt = 0;
+    stamp("share", "shareAt");
     save();
     showClear(0);
     renderHome();
@@ -1989,7 +1996,7 @@
     $("#continueBtn").textContent = tx(`Continue as ${last.name}`, `Fortsæt som ${last.name}`);
     $("#missedBtn").hidden = !wordsByDay(last).length;
     $("#missedBtn").textContent = tx("See the words", "Se ordene");
-    $("#rankBtn").hidden = !(last.google && last.share === true && cloudOn());
+    $("#rankBtn").hidden = !(last.share === true && boardOn()); // any sharer, Google or not (2026-11-13)
   }
   function fillUsers() {
     $("#userList").innerHTML = users().map((u) =>
@@ -2324,7 +2331,7 @@
   // From the later copy: settings shared by every language, and this language's own (its voice too). The language
   // itself is per device (user's bug report, 2026-11-04: a Chinese iPhone flipped to English when the same account
   // was used in English elsewhere); `lang` is sent only so that a new device starts in the account's last language.
-  const SYNC_SHARED = ["year", "bucket", "mute", "keySound", "practiseOrder", "share", "shareAsk"];
+  const SYNC_SHARED = ["year", "bucket", "mute", "keySound", "practiseOrder", "share", "shareAsk", "shareAt", "boardKey"];
   const SYNC_PER_LANG = ["tricky", "streak", "beeToday", "voice"];
   const SYNC_LATEST = [...SYNC_SHARED, ...SYNC_PER_LANG, "lang", "setAt"]; // what the cloud copy carries
   const SYNC_JOINED = ["seen", "learned", "practised"];
@@ -2522,50 +2529,150 @@
     d.setDate(d.getDate() - (6 - i));
     return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-") + "|" + d.toDateString();
   });
-  const canShare = () => !!(chosen && profile.google && cloudOn());
+  // ---------- The board on the Worker (user's request, 2026-11-13: every user can share, Google or not) ----------
+  // worker/src/index.js on Cloudflare keeps one row per sharer: id, masked name, words per day for the last 7 days.
+  // id "g:<Google uid>" for a Google user, "l:<install id>:<local id>" for a typed-name user (typingZen.install is
+  // made once per browser; profile.localId once per user, so two typed users here are two rows and a rename isn't a
+  // new one). Each row has a key (profile.boardKey, made on this device before its first write; a Google user's
+  // travels in their private Firestore profile, so all their devices can write it). The test build writes
+  // site "test", never the live board. Firestore's typingZen.board is no longer read: a Google sharer's device
+  // moves its old row across on its next write (higher count per day wins) and deletes it there.
+  const BOARD_API = "https://typing-zen-board.trix69.workers.dev";
+  const BOARD_SITE = "test"; // test build only // the test build: "test" (deploy_test.py)
+  const INSTALL_KEY = "typingZen.install-test";
+  const boardOn = () => window.top === window; // not inside the claude.ai copy
+  const canShare = () => !!(chosen && boardOn());
+  const RND = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+  const rnd = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => RND[b & 63]).join("");
+  const hex = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, "0")).join("");
+  function installId() {
+    try {
+      let v = localStorage.getItem(INSTALL_KEY);
+      if (!/^[A-Za-z0-9_-]{24}$/.test(v || "")) { v = rnd(24); localStorage.setItem(INSTALL_KEY, v); }
+      return v;
+    } catch { return null; }
+  }
+  function boardId(u) {
+    if (u.google) return "g:" + u.google.uid;
+    if (!/^[A-Za-z0-9_-]{12}$/.test(u.localId || "")) u.localId = rnd(12);
+    const i = installId();
+    return i ? `l:${i}:${u.localId}` : null;
+  }
+  async function rowHash(id) {
+    const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(id));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  }
+  // One request to the Worker; null when it can't be reached (offline, or down), never a hang over 10 s.
+  async function boardCall(path, opts = {}) {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 10000);
+    try {
+      const r = await fetch(BOARD_API + path, { ...opts, cache: "no-store", signal: ctl.signal });
+      const body = await r.json().catch(() => ({}));
+      return { status: r.status, body };
+    } catch { return null; } finally { clearTimeout(t); }
+  }
+  const boardRows = async () => { const r = await boardCall(`/board?site=${BOARD_SITE}`); return r && r.status === 200 && Array.isArray(r.body.rows) ? r.body.rows : null; };
   // The board counts the words tested in every language together (user's request, 2026-11-04).
   function myWeek(u) {
     const totals = dayTotals({ ...u, sessions: allSessions(u) }), days = {};
     for (const k of weekKeys()) { const [iso, ds] = k.split("|"); if (totals[ds] && totals[ds].words) days[iso] = totals[ds].words; }
     return days;
   }
-  // Puts this user's week on the board (or takes it off). Quietly does nothing offline or signed out.
+  // Puts this user's week on the board (or takes it off). The entry is this user's words over every device, so a Google
+  // user is synced first (user's report, 2026-11-04: 100+ words dropped to 35 after a round on another device); then
+  // it is written whatever the sync managed (user's request, 2026-11-12), each day taking the higher of this
+  // device's count and the row already there, so it can't go down. Offline or the Worker down: it is kept as
+  // pending and sent when the app is back online or opened again (it never holds up results, Home or the board).
+  // card: from the stats card (Welcome back), where no one is chosen yet: that user is synced first all the same.
   async function shareWrite(on, u = profile, card = false) {
-    if (!u.google || !cloudOn()) return false;
-    // The entry is this user's words over every device, so it is written only after a sync has brought the other
-    // devices' sessions here (user's report, 2026-11-04: 100+ words dropped to 35 after a round on another device).
-    // From the stats card (no one chosen yet) the user it shows is synced first, then written (user's report,
-    // 2026-11-12: a sharer who only ever opened the board there was never on it for anyone else).
-    if (on) {
-      if (u !== profile || (!chosen && !card)) return false;
+    if (!boardOn()) return false;
+    if (!on) return boardDelete(u);
+    if (u !== profile || (!chosen && !card)) return false;
+    if (u.google && cloudOn()) {
       await syncNow(!chosen);
-      // A sync already running when this asked queues another, which starts as that one ends and shows "busy": wait
-      // for it too, or the entry is silently never written (user's report, 2026-11-12: Stella said Yes while the
-      // sync after her round was still going, saw herself on the board, and no one else ever saw her).
+      // A sync already running when this asked queues another: wait for it too (user's report, 2026-11-12: Stella).
       while (syncing) await syncing.catch(() => {});
-      // Written whatever the sync managed (user's request, 2026-11-12: See where you rank always sends this
-      // device's words up, whichever side is newer), but never lower than the entry already there: each day takes
-      // the higher of this device's count and the server's, so a device that missed the others' rounds can't pull
-      // the total down (the 2026-11-04 report). Offline there is nothing to send.
-      if (navigator.onLine === false) return false;
     }
-    try {
-      const c = await userCloud(u.google.uid);
-      if (!c.auth.currentUser || c.auth.currentUser.uid !== u.google.uid) return false;
-      const b = c.fs.writeBatch(c.db), ref = c.fs.doc(c.db, BOARD, u.google.uid);
-      if (on) {
-        const days = myWeek(u), week = new Set(weekKeys().map((k) => k.split("|")[0]));
-        // Except after Clear history here: an entry older than the reset keeps nothing, so the cleared week leaves the
-        // board (Hermes R89.1); the write sets `updated` past `resetAt`, so later writes merge as usual.
-        const ent = (await c.fs.getDoc(ref)).data() || {};
-        const there = u.resetAt && u.resetAt > (ent.updated || "") ? {} : ent.days || {};
-        for (const [d, n] of Object.entries(there)) if (week.has(d) && Number(n) > (days[d] || 0)) days[d] = Number(n);
-        b.set(ref, { name: maskName(u.name), days, updated: new Date().toISOString() });
-      } else b.delete(ref);
-      // A commit with no connection waits for one: give up after 10 s rather than leave the board loading.
-      await Promise.race([b.commit(), new Promise((_, no) => setTimeout(() => no(new Error("timeout")), 10000))]);
-      return true;
-    } catch { return false; }
+    return boardWrite(u);
+  }
+  async function boardWrite(u, again = true) {
+    const id = boardId(u);
+    if (!id) return false;
+    if (!/^[0-9a-f]{40}$/.test(u.boardKey || "")) { u.boardKey = hex(20); if (u === profile) stamp("boardKey"); }
+    u.boardPending = true;
+    saveLocal();
+    const days = myWeek(u), week = new Set(weekKeys().map((k) => k.split("|")[0]));
+    const more = (there) => { for (const [d, n] of Object.entries(there || {})) if (week.has(d) && Number(n) > (days[d] || 0)) days[d] = Number(n); };
+    const rows = await boardRows();
+    if (!rows) return false; // can't be reached: still pending
+    const h = await rowHash(id);
+    more((rows.find((r) => r.h === h) || {}).days);
+    // A Google sharer's row from before the Worker (Firestore typingZen.board): counted in, then deleted there.
+    let old = null;
+    if (u.google && cloudOn()) {
+      try {
+        const c = await userCloud(u.google.uid);
+        if (c.auth.currentUser && c.auth.currentUser.uid === u.google.uid) {
+          const ref = c.fs.doc(c.db, BOARD, u.google.uid), snap = await c.fs.getDoc(ref);
+          if (snap.exists()) { more((snap.data() || {}).days); old = { c, ref }; }
+        }
+      } catch { /* not reachable now: tried again next time */ }
+    }
+    const r = await boardCall("/board", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ site: BOARD_SITE, id, name: maskName(u.name), days, key: u.boardKey }) });
+    if (!r) return false;
+    if (r.status === 403 && u.google && again && u === profile) {
+      // Another device of this account made the row with its key first: the sync brings that key here.
+      await syncNow(!chosen); while (syncing) await syncing.catch(() => {});
+      return boardWrite(u, false);
+    }
+    if (r.status !== 200) return false;
+    u.boardPending = false;
+    saveLocal();
+    if (old) { try { const b = old.c.fs.writeBatch(old.c.db); b.delete(old.ref); await b.commit(); } catch { /* deleted next time */ } }
+    return true;
+  }
+  // Takes a row off the board. If the Worker can't be reached, the request waits in store.boardGone (it survives
+  // the user being removed from this device) and is sent later.
+  async function boardDelete(u) {
+    const id = boardId(u), key = u.boardKey;
+    u.boardPending = false;
+    if (!id || !key) return true;
+    if (u.google && cloudOn()) {
+      try {
+        const c = await userCloud(u.google.uid);
+        if (c.auth.currentUser && c.auth.currentUser.uid === u.google.uid) { const b = c.fs.writeBatch(c.db); b.delete(c.fs.doc(c.db, BOARD, u.google.uid)); await b.commit(); }
+      } catch { /* the Firestore copy is no longer read */ }
+    }
+    const r = await boardCall(`/board/${encodeURIComponent(id)}?site=${BOARD_SITE}`, { method: "DELETE", headers: { "X-Board-Key": key } });
+    if (r && r.status === 200) return true;
+    store.boardGone = [...(store.boardGone || []).filter((x) => x.id !== id), { id, key }];
+    saveLocal();
+    return false;
+  }
+  // Anything still waiting: deletes first, then this user's week. On start-up, coming back online or to the app.
+  async function boardRetry() {
+    if (!boardOn()) return;
+    for (const g of [...(store.boardGone || [])]) {
+      const r = await boardCall(`/board/${encodeURIComponent(g.id)}?site=${BOARD_SITE}`, { method: "DELETE", headers: { "X-Board-Key": g.key } });
+      if (r && (r.status === 200 || r.status === 403)) { store.boardGone = store.boardGone.filter((x) => x.id !== g.id); saveLocal(); } // 403: not ours any more
+    }
+    if (chosen && profile.share === true && profile.boardPending) shareWrite(true);
+  }
+  window.addEventListener("online", () => boardRetry());
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) boardRetry(); });
+  setTimeout(boardRetry, 2500);
+  // When the question is asked (user's request, 2026-11-13): at word milestones of Spelling Bee words finished, all
+  // sessions together (every level, day and language): 10, 50, 100, then each doubling (200, 400, 800, 1600 …),
+  // once each, only while the user hasn't said Yes, and never after a No in Settings (profile.share === false) or the
+  // old "Don't remind me again" (shareAsk false). profile.shareAt is the highest milestone already asked; a round
+  // that passes two asks once, for the higher. Only on the Spelling Bee results or on Home, never in a round.
+  const milestoneOf = (total) => { let m = 0, next = 10; while (total >= next) { m = next; next = next === 10 ? 50 : next === 50 ? 100 : next * 2; } return m; };
+  const beeTotal = (u) => allSessions(u).filter((x) => x && x.game === "spell").reduce((n, x) => n + (x.firstTry || 0) + (x.struggled || 0), 0);
+  function shareDue() {
+    if (!canShare() || profile.share === true || profile.share === false || profile.shareAsk === false) return 0;
+    const m = milestoneOf(beeTotal(profile));
+    return m > (profile.shareAt || 0) ? m : 0;
   }
   const shareSheet = $("#shareSheet"), boardSheet = $("#boardSheet");
   // The question waits 0.6 s after the results; leaving the results screen first cancels it (Hermes R73.1), so it
@@ -2587,34 +2694,48 @@
   const onShareKey = trapFor(shareSheet, () => closeShare()), onBoardKey = trapFor(boardSheet, () => closeBoard());
   function askShare() {
     askTimer = 0;
-    if ($("#results").hidden) return;
+    const m = shareDue();
+    // Only over the Spelling Bee results or Home, with no round running and nothing else open.
+    if (!m || (game && !game.over) || ($("#results").hidden && $("#home").hidden) || [...document.querySelectorAll(".sheet")].some((el) => !el.hidden)) return;
+    profile.shareAt = m;
+    profile.askNext = false;
+    stamp("shareAt");
+    save();
+    // The example is this user's own name, masked as the board will show it (never a made-up one).
+    $("#shareAbout").innerHTML = tx(`Others will only see your name partly hidden, like <b>${escapeHtml(maskName(profile.name))}</b>.`,
+      `Andre ser kun dit navn delvist skjult, fx <b>${escapeHtml(maskName(profile.name))}</b>.`);
+    shareOpener = document.activeElement;
     shareSheet.hidden = false;
     document.addEventListener("keydown", onShareKey, true);
     $("#shareYes").focus();
   }
+  let shareOpener = null;
   function closeShare() {
     shareSheet.hidden = true;
     document.removeEventListener("keydown", onShareKey, true);
-    $("#againBtn").focus();
+    const back = !$("#results").hidden ? $("#againBtn") : shareOpener && shareOpener.isConnected && shareOpener.offsetParent ? shareOpener : null;
+    if (back) back.focus();
   }
+  // Ask if a milestone is due, 0.6 s from now (cancelled if a round starts or the screen changes first).
+  function maybeAsk() { cancelAsk(); if (shareDue()) askTimer = setTimeout(askShare, 600); }
   $("#shareYes").addEventListener("click", async () => {
     profile.share = true;
     stamp("share");
     save();
     closeShare();
-    $("#boardBtn").hidden = false;
+    $("#boardBtn").hidden = $("#results").hidden;
     await openBoard();
   });
-  $("#shareNo").addEventListener("click", () => closeShare()); // asked again next time
-  $("#shareNever").addEventListener("click", () => { profile.shareAsk = false; stamp("shareAsk"); save(); closeShare(); });
+  $("#shareNo").addEventListener("click", () => closeShare()); // nothing sent; asked again at the next milestone
   // After a Spelling Bee: share this week's count if the user shares, else ask (unless told not to).
   function afterBee(done) {
     cancelAsk();
     $("#boardBtn").hidden = !(canShare() && profile.share === true);
     if (!canShare()) return;
     if (profile.share === true) shareWrite(true);
-    // Asked only after a Bee with words done: a round that tested nothing has no result to share (Hermes note).
-    else if (done && profile.share === undefined && profile.shareAsk !== false) askTimer = setTimeout(askShare, 600);
+    // Asked only after a Bee with words done, and only at a milestone (shareDue). askNext remembers it until it has
+    // been shown, so leaving the results too quickly brings it on Home instead (and only then: Home never asks by itself).
+    else if (done && shareDue()) { profile.askNext = true; saveLocal(); maybeAsk(); }
   }
   // The board: the top three on stairs (1 in the middle and highest, 2 on the left, 3 on the right), then a list
   // of 4 and 5, and the users just above and below this one, with "…" for anyone skipped. Others' names are
@@ -2645,20 +2766,17 @@
     await shareWrite(true, u, true);
     let rows;
     try {
-      const c = await userCloud(u.google.uid);
-      const snap = await c.fs.getDocs(c.fs.query(c.fs.collection(c.db, BOARD)));
+      const got = await boardRows();
+      if (!got) throw new Error("board"); // a dead Worker says so: never an empty board pretending nobody plays
       const keys = weekKeys().map((k) => k.split("|")[0]);
-      rows = snap.docs.map((d) => {
-        const x = d.data() || {}, id = d.id || (d.ref && d.ref.path || "").split("/").pop();
-        return { id, name: String(x.name || "*"), words: keys.reduce((n, k) => n + (Number((x.days || {})[k]) || 0), 0) };
-      });
+      rows = got.map((x) => ({ id: String(x.h || ""), name: String(x.name || "*"), words: keys.reduce((n, k) => n + (Number((x.days || {})[k]) || 0), 0) }));
     } catch {
       body.innerHTML = `<p class="note">${navigator.onLine ? tx("Couldn't load the board just now. Please try again.", "Kunne ikke hente tavlen lige nu. Prøv igen.")
         : tx("You're offline. The board needs the internet.", "Du er offline. Tavlen kræver internet.")}</p>`;
       holdBoard(0); // nothing to wait for
       return;
     }
-    const me = u.google.uid;
+    const myId = boardId(u), me = myId ? await rowHash(myId) : "";
     if (!rows.some((r) => r.id === me)) rows.push({ id: me, name: maskName(u.name), words: Object.values(myWeek(u)).reduce((a, b) => a + b, 0) });
     rows = rows.filter((r) => r.words > 0 || r.id === me).sort((a, b) => b.words - a.words || a.name.localeCompare(b.name));
     const at = rows.findIndex((r) => r.id === me);
@@ -2692,21 +2810,20 @@
   boardSheet.addEventListener("click", (e) => { if (e.target === boardSheet) closeBoard(); });
   // Settings: Share my results, Yes or No. Only a Google user can share; No takes this user off the board.
   function showShare() {
-    const g = chosen && profile.google && cloudOn();
+    const g = chosen && boardOn();
     for (const b of $("#segShare").children) {
       b.disabled = !g;
       b.setAttribute("aria-checked", String(!!g && (b.dataset.share === "yes") === (profile.share === true)));
     }
-    $("#shareNote").textContent = !chosen ? "" : !g ? tx("Sharing needs a Google account.", "Deling kræver en Google-konto.")
-      : profile.share === true ? tx("Your words tested this week are on the board, with your name masked.", "Dine testede ord denne uge er på tavlen, med dit navn skjult.") : "";
+    $("#shareNote").textContent = !g ? ""
+      : profile.share === true ? tx(`Your words tested this week are on the board, your name shown as ${maskName(profile.name)}.`, `Dine testede ord denne uge er på tavlen, med dit navn vist som ${maskName(profile.name)}.`) : "";
   }
   $("#segShare").addEventListener("click", async (e) => {
     const b = e.target.closest("button");
     if (!b || b.disabled) return;
     const on = b.dataset.share === "yes";
-    profile.share = on;
-    stamp("share", "shareAsk");
-    if (!on) profile.shareAsk = false; // a clear No in Settings: don't ask after each Bee either
+    profile.share = on; // false: a clear No, so no milestone asks again
+    stamp("share");
     save();
     showShare();
     await shareWrite(on);
@@ -2755,6 +2872,7 @@
       } catch { /* offline: the account is forgotten here anyway */ }
     }
     $("#logoutYes").disabled = false;
+    if (!p.google && p.boardKey) boardDelete(p); // a typed-name user removed: their board row goes too (queued if offline)
     delete store.users[p.id];
     chosen = false;
     store.current = users()[0] ? users()[0].id : null;
@@ -2806,6 +2924,7 @@
     const ref = fs.doc(c.db, CLOUD, p.google.uid);
     const refs = (await fs.getDocs(fs.collection(ref, "sessions"))).docs.map((d) => d.ref);
     refs.push(fs.doc(c.db, BOARD, p.google.uid), ref);
+    if (p.boardKey) await boardDelete(p); // the row on the Worker too (kept in store.boardGone and retried if it can't be reached)
     for (let i = 0; i < refs.length; i += 400) {
       const b = fs.writeBatch(c.db);
       for (const r of refs.slice(i, i + 400)) b.delete(r);
