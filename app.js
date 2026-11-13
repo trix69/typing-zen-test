@@ -2623,6 +2623,7 @@
         }
       } catch { /* not reachable now: tried again next time */ }
     }
+    for (const d of Object.keys(days)) days[d] = Math.min(days[d], 500); // the Worker's cap per day (Hermes R91.1), after merging
     const r = await boardCall("/board", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ site: BOARD_SITE, id, name: maskName(u.name), days, key: u.boardKey }) });
     if (!r) return false;
