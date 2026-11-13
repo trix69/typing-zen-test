@@ -2576,6 +2576,9 @@
       return { status: r.status, body };
     } catch { return null; } finally { clearTimeout(t); }
   }
+  // Waits for p, but never longer than ms (Firestore on an iPhone can leave a read or commit hanging: user's report,
+  // 2026-11-13, the board stuck on "Loading this week's ranking…").
+  const within = (p, ms) => Promise.race([Promise.resolve(p).catch(() => {}), new Promise((r) => setTimeout(r, ms))]);
   const boardRows = async () => { const r = await boardCall(`/board?site=${BOARD_SITE}`); return r && r.status === 200 && Array.isArray(r.body.rows) ? r.body.rows : null; };
   // The board counts the words tested in every language together (user's request, 2026-11-04).
   function myWeek(u) {
@@ -2594,9 +2597,9 @@
     if (!on) return boardDelete(u);
     if (u !== profile || (!chosen && !card)) return false;
     if (u.google && cloudOn()) {
-      await syncNow(!chosen);
-      // A sync already running when this asked queues another: wait for it too (user's report, 2026-11-12: Stella).
-      while (syncing) await syncing.catch(() => {});
+      // A sync already running when this asked queues another: wait for it too (user's report, 2026-11-12: Stella),
+      // but never more than 6 s: the row is written with what this device has (and the Worker keeps the higher days).
+      await within((async () => { await syncNow(!chosen); while (syncing) await syncing.catch(() => {}); })(), 6000);
     }
     return boardWrite(u);
   }
@@ -2615,13 +2618,13 @@
     // A Google sharer's row from before the Worker (Firestore typingZen.board): counted in, then deleted there.
     let old = null;
     if (u.google && cloudOn()) {
-      try {
+      await within((async () => {
         const c = await userCloud(u.google.uid);
         if (c.auth.currentUser && c.auth.currentUser.uid === u.google.uid) {
           const ref = c.fs.doc(c.db, BOARD, u.google.uid), snap = await c.fs.getDoc(ref);
           if (snap.exists()) { more((snap.data() || {}).days); old = { c, ref }; }
         }
-      } catch { /* not reachable now: tried again next time */ }
+      })(), 4000); // not reachable now (or too slow): tried again next time
     }
     for (const d of Object.keys(days)) days[d] = Math.min(days[d], 500); // the Worker's cap per day (Hermes R91.1), after merging
     const r = await boardCall("/board", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -2724,9 +2727,15 @@
     profile.askNext = false;
     stamp("shareAt");
     save();
-    // The example is this user's own name, masked as the board will show it (never a made-up one).
-    $("#shareAbout").innerHTML = tx(`Others will only see your name partly hidden, like <b>${escapeHtml(maskName(profile.name))}</b>.`,
-      `Andre ser kun dit navn delvist skjult, fx <b>${escapeHtml(maskName(profile.name))}</b>.`);
+    // This week's words, then the question (user's wording, 2026-11-13), then this user's own name masked as the board
+    // will show it (never a made-up one).
+    const n = Object.values(myWeek(profile)).reduce((a, b) => a + b, 0), mask = `<b>${escapeHtml(maskName(profile.name))}</b>`;
+    $("#shareTitle").textContent = n > 0 ? tx(`You've practised ${n} word${n === 1 ? "" : "s"} in the last 7 days.`, `Du har øvet ${n} ord de sidste 7 dage.`)
+      : tx("Compare your words with other users?", "Sammenlign dine ord med andre brugere?");
+    $("#shareAbout").innerHTML = tx(`Would you like to share these and compare with other users? Others will only see your name partly hidden, like ${mask}.`,
+      `Vil du dele dem og sammenligne med andre brugere? Andre ser kun dit navn delvist skjult, fx ${mask}.`);
+    $("#shareYes").textContent = tx("Yes, share", "Ja, del");
+    $("#shareNo").textContent = tx("No", "Nej");
     shareOpener = document.activeElement;
     shareSheet.hidden = false;
     document.addEventListener("keydown", onShareKey, true);
@@ -2786,7 +2795,7 @@
     holdBoard(BOARD_HOLD);
     const body = $("#boardBody");
     body.innerHTML = `<p class="note board-loading" role="status"><span class="spinner" aria-hidden="true"></span>${tx("Loading this week's ranking…", "Henter ugens rangliste …")}</p>`;
-    await shareWrite(true, u, true);
+    await within(shareWrite(true, u, true), 12000); // the ranking is shown even if the write is stuck
     let rows;
     try {
       const got = await boardRows();
