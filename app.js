@@ -2664,6 +2664,23 @@
     }
     if (chosen && profile.share === true && profile.boardPending) shareWrite(true);
   }
+  // ---------- Launch counts (Trix, 2026-11-13; in the privacy policy) ----------
+  // One POST /hit per launch while online, only once the privacy policy is accepted, and again on coming back after 6
+  // hours away (a home-screen app is often resumed, not reopened): this browser's random id, browser or home-screen
+  // app, the version, and whether the device has a Google user, only typed names, or no user yet. Nothing offline,
+  // nothing in the claude.ai copy, never retried; a failed count is simply lost.
+  let hitAt = 0;
+  function countLaunch() {
+    if (!boardOn() || navigator.onLine === false || document.hidden || !ppAccepted()) return;
+    const id = installId();
+    if (!id) return;
+    hitAt = Date.now();
+    const all = users(), who = all.some((u) => u.google) ? "google" : all.length ? "typed" : "none";
+    // Plain text (the Worker parses it as JSON either way): a "simple" request needs no CORS preflight round trip.
+    boardCall("/hit", { method: "POST", headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ site: BOARD_SITE, id, c: homeApp() ? "pwa" : "web", v: $("#appVersion").textContent.trim(), u: who }) });
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && hitAt && Date.now() - hitAt > 6 * 3600e3) countLaunch(); });
   window.addEventListener("online", () => boardRetry());
   document.addEventListener("visibilitychange", () => { if (!document.hidden) boardRetry(); });
   setTimeout(boardRetry, 2500);
@@ -3096,6 +3113,7 @@
     try { localStorage.setItem(PP_KEY, PP); } catch { /* storage unavailable: asked again next time */ }
     ppIgnoreSaved = false;
     closePolicy();
+    if (!hitAt) countLaunch(); // the first launch is counted once the policy is accepted
     if (!sheet.hidden) syncSheet();
   });
   $("#ppDecline").addEventListener("click", () => { $("#ppNeed").hidden = false; $("#ppAccept").focus(); });
@@ -3106,6 +3124,7 @@
   showWelcome();
   const back = cloudOn() && cameBack();
   if (!ppAccepted()) showPolicy();
+  setTimeout(countLaunch, 2000);
   if (back && back.why === "sync") syncSignIn(back.user);
   else if (back) googleStart(users().length ? $("#googleSwitch") : $("#googleNew"), back.user);
 })();

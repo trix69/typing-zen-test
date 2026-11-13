@@ -41,7 +41,7 @@
 <section id="en">
 <div class="summary">
 <p>Typing Zen signs you in with Google so your progress can follow you between devices, and keeps everything else on this device. This page explains what is stored, where, and how to delete it.</p>
-<p>No advertising, no analytics, no third-party trackers. Typing Zen itself sets no cookies.</p>
+<p>No advertising and no third-party trackers. Typing Zen counts its own launches with a random device id and nothing about who you are (see below). It sets no cookies.</p>
 </div>
 
 <h2>Who runs Typing Zen</h2>
@@ -51,13 +51,13 @@
 <p>Typing Zen is made for primary-school children (Year 1 to Year 6). A parent or guardian should read this page and accept it, and should decide whether the child signs in with Google. Children under 13 can only have a Google account that a parent manages (Google Family Link); without one, the child can type a name instead, and then nothing leaves the device.</p>
 
 <h2>Two ways to use it</h2>
-<p><strong>With a typed name</strong> (no account): everything stays on this device, in the browser's storage. Nothing is sent anywhere, unless you choose to join the ranking board (below).</p>
+<p><strong>With a typed name</strong> (no account): everything stays on this device, in the browser's storage. Only an anonymous launch count is sent, and the words tested this week if you choose to join the ranking board (both below).</p>
 <p><strong>Signed in with Google</strong>: the progress is also saved on Google's servers (Firebase) so it follows the child to other devices.</p>
 
 <h2>What is kept on this device</h2>
 <ul>
 <li>Each user's name, school year and level, and their progress: stars, best speed, rounds played, tricky words, words to practise and practised, mastered words, the Spelling Bee rounds (date, language, level, length, and the words right first try or needing another try; the last 500 per language), and their settings (language, voice, key sound, sound on or off, practice order, sharing choice). For a Google user, also their Google account id and e-mail address. (Browser storage <code>typingZen.v2</code>.)</li>
-<li>Device settings: appearance (<code>typingZen.theme</code>), automatic update check (<code>typingZen.autoUpd</code>), the date of the privacy policy you accepted (<code>typingZen.pp</code>), and a random id for this browser, made only for the ranking board (<code>typingZen.install</code>).</li>
+<li>Device settings: appearance (<code>typingZen.theme</code>), automatic update check (<code>typingZen.autoUpd</code>), the date of the privacy policy you accepted (<code>typingZen.pp</code>), and a random id for this browser, used to count launches and for the ranking board (<code>typingZen.install</code>).</li>
 <li>While signing in from the home-screen app, a random check value for a few seconds (<code>typingZen.google</code>), removed when Google sends you back.</li>
 <li>Google's own sign-in record for each signed-in account, kept by Firebase in the browser (your account id, name, e-mail address and profile picture link). Typing Zen doesn't show or use the picture.</li>
 <li>An offline copy of the app's files (pages, fonts, sounds), so it works without the internet.</li>
@@ -70,6 +70,7 @@
 <tr><td>A signed-in user's progress is saved (a few seconds after a change, and when the app is reopened)</td><td>Google Firebase (Firestore), stored in Sydney, Australia (australia-southeast1)</td><td>One record per account, under its account id: the settings and progress listed above, but <strong>not the name or e-mail address</strong>. One record per Spelling Bee round: date, language, level, length, and the words right first try or needing another try.</td></tr>
 <tr><td>You join the ranking board (any user; asked only after 10, 50, 100, 200 … words, off unless you say yes; also in Settings)</td><td>Typing Zen's ranking board on Cloudflare (a Worker and a D1 database in its Oceania region)</td><td>A random id (the Google account id, or this browser's random id plus one for the user), a masked name (for example <code>Lu*****h</code>, masked on the device, so the full name is never sent), and the number of words tested on each of the last 7 days. Everyone else on the board sees the masked name and the counts, never the id. The board keeps no IP address, browser details or cookies.</td></tr>
 <tr><td>Google sign-in or a signed-in user's sync</td><td>Google (www.gstatic.com)</td><td>The Firebase program code is downloaded. Not loaded at all for typed-name users.</td></tr>
+<tr><td>Each launch while online, once you have accepted this policy (and again on coming back to the app after 6 hours)</td><td>Typing Zen's own counter on Cloudflare (the same Worker and D1 database in its Oceania region)</td><td>This browser's random id, whether it is a browser tab or the home-screen app, the app version, and whether the device has a Google user, only typed names or no user yet. Counted per day. No name, no progress, no IP address or browser details. It only tells how many devices use the app and how often.</td></tr>
 <tr><td>Checking for a new version (Settings, or automatically if you leave that on)</td><td>GitHub Pages (this site)</td><td>An ordinary request for <code>version.json</code>. Nothing about you is in it.</td></tr>
 <tr><td>Opening the app</td><td>GitHub Pages (this site)</td><td>The app's files, like any website. GitHub receives the usual technical details of a web request (IP address, browser), under <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>.</td></tr>
 <tr><td>A word is read aloud</td><td>Your device's speech voices</td><td>The word or sentence. Most voices run on the device. Some browsers' online voices (for example Chrome's "Google" voices or Edge's online voices) send that text to the browser maker to be spoken.</td></tr>
@@ -77,12 +78,13 @@
 <p>The links to GitHub and Buy Me a Coffee in Settings open those websites, under their own policies. Typing Zen sends nothing to them.</p>
 
 <h2>Why</h2>
-<p>Only to run the app: to remember each child's progress and settings, to let a signed-in child carry on from another device, to show the optional ranking board, and to offer new versions. Nothing is sold, shared for advertising, or used to build a profile.</p>
+<p>Only to run the app: to remember each child's progress and settings, to let a signed-in child carry on from another device, to show the optional ranking board, to offer new versions, and to count how many devices use the app. Nothing is sold, shared for advertising, or used to build a profile.</p>
 
 <h2>How long it is kept, and how to delete it</h2>
 <ul>
 <li><strong>On this device:</strong> until you remove it. Settings → Clear history deletes a user's progress; Settings → Remove (typed name) or Log out (Google user) takes the user off this device; clearing the browser's data for this site deletes everything.</li>
 <li><strong>On Google's servers:</strong> until you delete it. Settings → <strong>Delete my data from Google</strong> deletes the account's record, all its Spelling Bee rounds and its ranking entry, then logs out. Log out on the child's other devices first, or they save their copy again. Clear history deletes the rounds.</li>
+<li><strong>Launch counts:</strong> kept 400 days, then deleted. They hold no name or progress; clearing the browser's data for this site gives the device a new random id.</li>
 <li><strong>On the ranking board:</strong> until you leave it. Settings → Share my results → No, Clear history, Remove (typed name) and Delete my data from Google all delete the entry; if the device is offline, it is deleted as soon as it is back online. Days older than a week no longer count.</li>
 <li>Google's sign-in record for Typing Zen (account id, name, e-mail, picture link) is deleted with <em>Delete my data from Google</em> when Google allows it; Google sometimes asks for a recent sign-in first. If that happens, or for anything else, e-mail <a href="mailto:trinks.wang@gmail.com">trinks.wang@gmail.com</a> and it will be deleted.</li>
 </ul>
@@ -97,7 +99,7 @@
 <h1>Typing Zen: privatlivspolitik</h1>
 <div class="summary">
 <p>Typing Zen logger dig ind med Google, så din fremgang kan følge dig mellem enheder; alt andet bliver på denne enhed. Her står hvad der gemmes, hvor, og hvordan du sletter det.</p>
-<p>Ingen reklamer, ingen statistikværktøjer, ingen sporing fra tredjeparter. Typing Zen sætter selv ingen cookies.</p>
+<p>Ingen reklamer og ingen sporing fra tredjeparter. Typing Zen tæller selv sine opstarter med et tilfældigt id for enheden og intet om, hvem du er (se nedenfor). Den sætter ingen cookies.</p>
 </div>
 
 <h2>Hvem står bag</h2>
@@ -107,13 +109,13 @@
 <p>Typing Zen er lavet til skolebørn fra 0. til 5. klasse. En forælder eller værge bør læse denne side og acceptere den og bestemme, om barnet logger ind med Google. Børn under 13 kan kun have en Google-konto, som en forælder styrer (Google Family Link); uden en sådan kan barnet skrive et navn i stedet, og så forlader intet enheden.</p>
 
 <h2>To måder at bruge den på</h2>
-<p><strong>Med et skrevet navn</strong> (ingen konto): alt bliver på denne enhed, i browserens lager. Intet sendes nogen steder hen, medmindre du vælger at komme med på ranglisten (se nedenfor).</p>
+<p><strong>Med et skrevet navn</strong> (ingen konto): alt bliver på denne enhed, i browserens lager. Kun en anonym optælling af opstarter sendes, og ugens testede ord, hvis du vælger at komme med på ranglisten (begge nedenfor).</p>
 <p><strong>Logget ind med Google</strong>: fremgangen gemmes også på Googles servere (Firebase), så den følger barnet til andre enheder.</p>
 
 <h2>Hvad der gemmes på denne enhed</h2>
 <ul>
 <li>Hver brugers navn, klassetrin og niveau og deres fremgang: stjerner, bedste fart, spillede runder, svære ord, ord at øve og øvede ord, mestrede ord, Stavebi-runderne (dato, sprog, niveau, længde og ordene der var rigtige i første forsøg eller krævede et forsøg mere; de seneste 500 pr. sprog) og deres indstillinger (sprog, stemme, tastelyd, lyd til eller fra, rækkefølge i Øv, valg om deling). For en Google-bruger også Google-kontoens id og e-mailadresse. (Browserlager <code>typingZen.v2</code>.)</li>
-<li>Enhedens indstillinger: udseende (<code>typingZen.theme</code>), automatisk søgning efter opdateringer (<code>typingZen.autoUpd</code>) datoen på den privatlivspolitik, du har accepteret (<code>typingZen.pp</code>), og et tilfældigt id for denne browser, kun til ranglisten (<code>typingZen.install</code>).</li>
+<li>Enhedens indstillinger: udseende (<code>typingZen.theme</code>), automatisk søgning efter opdateringer (<code>typingZen.autoUpd</code>) datoen på den privatlivspolitik, du har accepteret (<code>typingZen.pp</code>), og et tilfældigt id for denne browser, brugt til at tælle opstarter og til ranglisten (<code>typingZen.install</code>).</li>
 <li>Mens man logger ind fra hjemmeskærms-appen: en tilfældig kontrolværdi i nogle sekunder (<code>typingZen.google</code>), som fjernes, når Google sender dig tilbage.</li>
 <li>Googles egen login-post for hver indlogget konto, som Firebase gemmer i browseren (kontoens id, navn, e-mailadresse og link til profilbillede). Typing Zen viser og bruger ikke billedet.</li>
 <li>En offline-kopi af appens filer (sider, skrifttyper, lyde), så den virker uden internet.</li>
@@ -126,6 +128,7 @@
 <tr><td>Når en indlogget brugers fremgang gemmes (nogle sekunder efter en ændring, og når appen åbnes igen)</td><td>Google Firebase (Firestore), gemt i Sydney, Australien (australia-southeast1)</td><td>Én post pr. konto under kontoens id: indstillingerne og fremgangen nævnt ovenfor, men <strong>ikke navnet eller e-mailadressen</strong>. Én post pr. Stavebi-runde: dato, sprog, niveau, længde og ordene der var rigtige i første forsøg eller krævede et forsøg mere.</td></tr>
 <tr><td>Når du kommer med på ranglisten (alle brugere; der spørges kun efter 10, 50, 100, 200 … ord, og det er slået fra, medmindre du siger ja; også i Indstillinger)</td><td>Typing Zens rangliste hos Cloudflare (en Worker og en D1-database i deres Oceanien-region)</td><td>Et tilfældigt id (Google-kontoens id, eller denne browsers tilfældige id plus et for brugeren), et maskeret navn (fx <code>Lu*****h</code>, maskeret på enheden, så det fulde navn aldrig sendes), og antal testede ord på hver af de seneste 7 dage. Alle andre på ranglisten ser det maskerede navn og tallene, aldrig id'et. Ranglisten gemmer ingen IP-adresse, browseroplysninger eller cookies.</td></tr>
 <tr><td>Ved login med Google eller en indlogget brugers synkronisering</td><td>Google (www.gstatic.com)</td><td>Firebases programkode hentes. Hentes slet ikke for brugere med et skrevet navn.</td></tr>
+<tr><td>Hver opstart med internet, når du har accepteret denne politik (og igen når du vender tilbage til appen efter 6 timer)</td><td>Typing Zens egen tæller hos Cloudflare (samme Worker og D1-database i deres Oceanien-region)</td><td>Denne browsers tilfældige id, om det er en browserfane eller hjemmeskærms-appen, appens version, og om enheden har en Google-bruger, kun skrevne navne eller endnu ingen bruger. Tælles pr. dag. Intet navn, ingen fremgang, ingen IP-adresse eller browseroplysninger. Den viser kun, hvor mange enheder der bruger appen, og hvor tit.</td></tr>
 <tr><td>Ved søgning efter en ny version (i Indstillinger, eller automatisk hvis det er slået til)</td><td>GitHub Pages (denne side)</td><td>En almindelig forespørgsel på <code>version.json</code>. Intet om dig er med.</td></tr>
 <tr><td>Når appen åbnes</td><td>GitHub Pages (denne side)</td><td>Appens filer, som ved enhver hjemmeside. GitHub modtager de sædvanlige tekniske oplysninger ved en forespørgsel (IP-adresse, browser), under <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">GitHubs privatlivserklæring</a>.</td></tr>
 <tr><td>Når et ord læses højt</td><td>Enhedens stemmer</td><td>Ordet eller sætningen. De fleste stemmer kører på enheden. Nogle browseres online-stemmer (fx Chromes "Google"-stemmer eller Edges online-stemmer) sender teksten til browserens udvikler for at blive læst op.</td></tr>
@@ -133,12 +136,13 @@
 <p>Linkene til GitHub og Buy Me a Coffee i Indstillinger åbner de hjemmesider under deres egne politikker. Typing Zen sender intet til dem.</p>
 
 <h2>Hvorfor</h2>
-<p>Kun for at appen kan virke: for at huske hvert barns fremgang og indstillinger, for at et indlogget barn kan fortsætte på en anden enhed, for at vise den valgfrie rangliste og for at tilbyde nye versioner. Intet sælges, deles til reklamer eller bruges til at lave en profil.</p>
+<p>Kun for at appen kan virke: for at huske hvert barns fremgang og indstillinger, for at et indlogget barn kan fortsætte på en anden enhed, for at vise den valgfrie rangliste, for at tilbyde nye versioner og for at tælle, hvor mange enheder der bruger appen. Intet sælges, deles til reklamer eller bruges til at lave en profil.</p>
 
 <h2>Hvor længe det gemmes, og hvordan du sletter det</h2>
 <ul>
 <li><strong>På denne enhed:</strong> indtil du fjerner det. Indstillinger → Ryd historik sletter en brugers fremgang; Indstillinger → Fjern (skrevet navn) eller Log ud (Google-bruger) fjerner brugeren fra denne enhed; at rydde browserens data for denne side sletter alt.</li>
 <li><strong>På Googles servere:</strong> indtil du sletter det. Indstillinger → <strong>Slet mine data hos Google</strong> sletter kontoens post, alle dens Stavebi-runder og dens plads på ranglisten og logger derefter ud. Log først ud på barnets andre enheder, ellers gemmer de deres kopi igen. Ryd historik sletter runderne.</li>
+<li><strong>Optælling af opstarter:</strong> gemmes i 400 dage og slettes derefter. Den indeholder intet navn og ingen fremgang; at rydde browserens data for denne side giver enheden et nyt tilfældigt id.</li>
 <li><strong>På ranglisten:</strong> indtil du forlader den. Indstillinger → Del mine resultater → Nej, Ryd historik, Fjern (skrevet navn) og Slet mine data hos Google sletter alle pladsen; er enheden offline, slettes den, så snart den er online igen. Dage ældre end en uge tæller ikke længere.</li>
 <li>Googles login-post for Typing Zen (kontoens id, navn, e-mail, link til billede) slettes med <em>Slet mine data hos Google</em>, når Google tillader det; Google beder nogle gange om et nyt login først. Hvis det sker, eller for alt andet, så skriv til <a href="mailto:trinks.wang@gmail.com">trinks.wang@gmail.com</a>, så bliver det slettet.</li>
 </ul>
